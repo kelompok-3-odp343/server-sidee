@@ -29,9 +29,11 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-security")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-mail")
-
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
+    implementation("com.auth0:java-jwt:4.4.0")
 	implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("io.soabase.record-builder:record-builder-core:47")
+
 
     implementation("com.oracle.database.jdbc:ojdbc11:23.4.0.24.05")
 

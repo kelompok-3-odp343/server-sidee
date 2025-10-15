@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Builder
+@Getter @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -35,8 +36,7 @@ public class OtpVerification {
     private LocalDateTime expiresAt;
 
     @Column(nullable = false)
-    @Convert(converter = NumericBooleanConverter.class)
-    private boolean isUsed;
+    private Integer isUsed;
 
     @Column(nullable = false)
     private LocalDateTime createdTime;

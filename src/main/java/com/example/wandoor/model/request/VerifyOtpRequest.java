@@ -4,9 +4,9 @@ import jakarta.validation.constraints.NotBlank;
 
 public record VerifyOtpRequest(
         @NotBlank
-        String otpRef,
+        String otp_ref,
 
         @NotBlank
-        String otp
+        String otp_code
 ) {
 }

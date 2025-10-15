@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 @RecordBuilder
 public record LoginRequest(
         @NotBlank
-        String userId,
+        String username,
 
         @NotBlank
         String password

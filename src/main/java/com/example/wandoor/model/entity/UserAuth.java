@@ -36,6 +36,5 @@ public class UserAuth {
     private String password;
 
     @Column(nullable = false)
-    @Convert(converter = NumericBooleanConverter.class)
-    private boolean isUserBlocked;
+    private Integer isUserBlocked;
 }

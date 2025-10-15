@@ -28,7 +28,7 @@ public class RoleManagement {
     private String userId;
 
     @Column(nullable = false)
-    private String rollName;
+    private String roleName;
 
     @Column(nullable = false)
     private String createdBy;
