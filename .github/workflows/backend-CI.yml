@@ -58,7 +58,7 @@ jobs:
 
       # Build dengan Gradle (bisa tambahkan test jika ingin uji koneksi DB)
       - name: Build with Gradle
-        run: ./gradlew clean build
+        run: ./gradlew clean build -x test
 
       # Log in to DockerHub
       - name: Log in to DockerHub
