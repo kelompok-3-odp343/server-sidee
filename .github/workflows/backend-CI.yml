@@ -60,6 +60,10 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew clean build -x test
 
+      #         # Build dan jalankan tes tertentu dengan Gradle
+      # - name: Build and run specific tests with Gradle
+      #   run: ./gradlew clean test --tests "com.example.MathServiceTest.testTambah"  # Jalankan tes tertentu
+
       # Log in to DockerHub
       - name: Log in to DockerHub
         uses: docker/login-action@v2
@@ -79,3 +83,21 @@ jobs:
         with:
           push: true
           tags: jrtr1/wandoor-backend-app:backend-latest
+
+# # Deploy ke Minikube (contoh CD)
+#       - name: Deploy to Minikube
+#         run: |
+#           # Set up Minikube environment
+#           minikube start
+#           eval $(minikube docker-env)
+
+#           # Deploy aplikasi Spring Boot ke Minikube
+#           kubectl apply -f deployment.yaml
+#           kubectl apply -f service.yaml
+
+#           # Tunggu beberapa detik agar aplikasi dapat dijangkau
+#           echo "Waiting for Minikube to be ready..."
+#           sleep 30
+
+#           # Menampilkan IP dari Minikube untuk mengakses aplikasi
+#           minikube service spring-boot-app-service --url
