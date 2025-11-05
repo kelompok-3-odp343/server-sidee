@@ -57,7 +57,7 @@ public class SplitBillService {
                 var userExists = profileRepository.findByIdAndCif(userId, cif)
                         .orElseThrow(() -> {
                                 log.warn("User not found for userId={} and cif={}", userId, cif);
-                                return new BusinessException(HttpStatus.NOT_FOUND, "INVALID_USER", "User not found");                       
+                                return new BusinessException(HttpStatus.NOT_FOUND, "INVALID_USER", "User not found");
                         });
         
                 List<SplitBill> userSplitBills = splitBillRepository.findByUserIdAndCif(userId, cif);
@@ -128,93 +128,90 @@ public class SplitBillService {
         } catch (Exception e) {
                 log.error("Unexpected error fetching split bills", e);
                 throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to fetch split bills");
-                // TODO: handle exception
-        } finally {
-                MDC.clear();      
         }
 }
 
-public SplitBillDetailResponse getAllSplitBillMember(SplitBillDetailRequest request) {
-        var userId = RequestContext.get().getUserId();
-        var cif = RequestContext.get().getCif();
-        
-        try {
-                var splitBIllData = splitBillRepository.findByUserIdAndCifAndId(userId, cif, request.splitBillId())
-                .orElseThrow(() -> new BusinessException(HttpStatus.CONFLICT, "DATA_NOT_FOUND","Split Bill Not Found"));
-                //        if (splitBIllData.isEmpty()) {
-                        //            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found");
-                        //        }
-                        
-                        var transactionData = trxHistoryRepository.findById(splitBIllData.getTransactionId())
-                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "No Transaction Related to Split BIll"));
-                        
-                        var members = splitBillMemberRepository.findAllBySplitBillId(request.splitBillId());
-                        if (members.isEmpty()) {
-                                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found");
-                        }
-                        
-                        // Buat list member response
-                        List<SplitBillDetailResponse.Data.Member> memberList = new ArrayList<>();
-                        for (SplitBillMember m : members) {
-                                Boolean hasPaid = m.getHasPaid() != null && m.getHasPaid() == 1;
-                                BigDecimal amountShare = m.getAmountShare();
-                                
-                                // Jika hasPaid >= amountShare → Paid, else Unpaid
-                                //String status = (hasPaid.compareTo(amountShare) >= 0) ? "Paid" : "Unpaid";
-                                
-                                // Konversi tanggal ke String agar cocok dengan record
-                                String paymentDate = (m.getPaymentDate() != null)
-                                ? m.getPaymentDate().toString()
-                                : "-";
-                                
-                                memberList.add(new SplitBillDetailResponse.Data.Member(
-                                        m.getId(),
-                                        m.getMemberName(),
-                                        amountShare,
-                                        paymentDate,
-                                        hasPaid
-                                        ));
-                                }
-                                
-                                
-                                
-                                
-                                // Ambil data utama dari transaksi split bill
-                                
-                                SplitBillDetailResponse.Data data = new SplitBillDetailResponse.Data(
-                                        splitBIllData.getId(),
-                                        splitBIllData.getSplitBillTitle(),
-                                        splitBIllData.getCurrency(),
-                                        transactionData.getRefId(),
-                                        splitBIllData.getCreatedTime().toString(),
-                                        splitBIllData.getTotalAmount(),
-                                        splitBIllData.getCreatedTime().toString(),
-                        transactionData.getTransactionDate().toString(),
-                        memberList
-                        );
-                        
-                        // Return response akhir
-                        return new SplitBillDetailResponse(
-                                data
-                                );
-                                
-                        } catch (ResponseStatusException e) {
-                                log.warn("Business error while fetching split bills: {}", e.getMessage());
-                                throw e;
-                                // TODO: handle exception
-                        } catch (Exception e) {
-                                log.error("Unexpected error fetching split bills", e);
-                                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to fetch split bills");
-                                // TODO: handle exception
-                        } finally {
-                                MDC.clear();      
-                        }
-                                
-                }
-                
-                @Transactional
-                public AddNewSplitBillResponse createSplitBill(AddNewSplitBillRequest request) {
-                        //        System.out.println("Hai Aku dari Service");
+    public SplitBillDetailResponse getAllSplitBillMember(SplitBillDetailRequest request) {
+            var userId = RequestContext.get().getUserId();
+            var cif = RequestContext.get().getCif();
+
+            try {
+                    var splitBIllData = splitBillRepository.findByUserIdAndCifAndId(userId, cif, request.splitBillId())
+                    .orElseThrow(() -> new BusinessException(HttpStatus.CONFLICT, "DATA_NOT_FOUND","Split Bill Not Found"));
+                    //        if (splitBIllData.isEmpty()) {
+                            //            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found");
+                            //        }
+
+                            var transactionData = trxHistoryRepository.findById(splitBIllData.getTransactionId())
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "No Transaction Related to Split BIll"));
+
+                            var members = splitBillMemberRepository.findAllBySplitBillId(request.splitBillId());
+                            if (members.isEmpty()) {
+                                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found");
+                            }
+
+                            // Buat list member response
+                            List<SplitBillDetailResponse.Data.Member> memberList = new ArrayList<>();
+                            for (SplitBillMember m : members) {
+                                    Boolean hasPaid = m.getHasPaid() != null && m.getHasPaid() == 1;
+                                    BigDecimal amountShare = m.getAmountShare();
+
+                                    // Jika hasPaid >= amountShare → Paid, else Unpaid
+                                    //String status = (hasPaid.compareTo(amountShare) >= 0) ? "Paid" : "Unpaid";
+
+                                    // Konversi tanggal ke String agar cocok dengan record
+                                    String paymentDate = (m.getPaymentDate() != null)
+                                    ? m.getPaymentDate().toString()
+                                    : "-";
+
+                                    memberList.add(new SplitBillDetailResponse.Data.Member(
+                                            m.getId(),
+                                            m.getMemberName(),
+                                            amountShare,
+                                            paymentDate,
+                                            hasPaid
+                                            ));
+                                    }
+
+
+
+
+                                    // Ambil data utama dari transaksi split bill
+
+                                    SplitBillDetailResponse.Data data = new SplitBillDetailResponse.Data(
+                                            splitBIllData.getId(),
+                                            splitBIllData.getSplitBillTitle(),
+                                            splitBIllData.getCurrency(),
+                                            transactionData.getRefId(),
+                                            splitBIllData.getCreatedTime().toString(),
+                                            splitBIllData.getTotalAmount(),
+                                            splitBIllData.getCreatedTime().toString(),
+                            transactionData.getTransactionDate().toString(),
+                            memberList
+                            );
+
+                            // Return response akhir
+                            return new SplitBillDetailResponse(
+                                    data
+                                    );
+
+                            } catch (ResponseStatusException e) {
+                                    log.warn("Business error while fetching split bills: {}", e.getMessage());
+                                    throw e;
+                                    // TODO: handle exception
+                            } catch (Exception e) {
+                                    log.error("Unexpected error fetching split bills", e);
+                                    throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to fetch split bills");
+                                    // TODO: handle exception
+                            } finally {
+                                    MDC.clear();
+                            }
+
+                    }
+
+    @Transactional
+    public AddNewSplitBillResponse createSplitBill(AddNewSplitBillRequest request) {
+        //        System.out.println("Hai Aku dari Service");
         log.info("Receive create split bill request dari service: {}", request.splitBillTitle());
         var userId = RequestContext.get().getUserId();
         var cif = RequestContext.get().getCif();

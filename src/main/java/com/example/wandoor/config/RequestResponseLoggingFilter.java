@@ -50,6 +50,9 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter{
 
                 try {
                     filterChain.doFilter(requestWrapper, responseWrapper);
+                } catch ( Exception e ){
+                    log.error("Exception during request processing", e);
+                    throw e;
                 } finally {
                     long duration = System.currentTimeMillis() - start;
 
@@ -58,15 +61,16 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter{
                         || "PUT".equalsIgnoreCase(request.getMethod())
                         || "PATCH".equalsIgnoreCase(request.getMethod())) {
                         byte[] buf = requestWrapper.getContentAsByteArray();
-                        requestBody = new String(buf, StandardCharsets.UTF_8);   
+                        requestBody = new String(buf, StandardCharsets.UTF_8);
+                        requestBody = requestBody.replaceAll("(?i)\"password\"\\s*:\\s*\"[^\"]+\"", "\"password\":\"***\"");
                     } else {
                         requestBody = request.getQueryString() != null ? request.getQueryString() : "";
                     };
 
                     String responseBody = "";
                     byte[] resBody = responseWrapper.getContentAsByteArray();
-                    if (resBody.length > 0 ){
-                        responseBody = new String(resBody, StandardCharsets.UTF_8);
+                    if (resBody.length > 2000 ){
+                        responseBody = responseBody.substring(0, 2000) + "...(truncated)";
                     }
 
                     int status = responseWrapper.getStatus();

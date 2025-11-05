@@ -1,5 +1,6 @@
 package com.example.wandoor.service;
 
+import com.example.wandoor.exception.BusinessException;
 import com.example.wandoor.model.entity.OtpVerification;
 import com.example.wandoor.model.entity.Profile;
 import com.example.wandoor.model.entity.RoleManagement;
@@ -14,11 +15,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.HashOperations;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -117,7 +116,7 @@ class LoginOtpServiceTest {
         var ex = catchThrowable(() -> loginOtpService.login(req));
 
         assertThat(ex)
-                .isInstanceOf(ResponseStatusException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Username atau Password salah");
     }
 
@@ -136,7 +135,7 @@ class LoginOtpServiceTest {
         var ex = catchThrowable(() -> loginOtpService.login(req));
 
         assertThat(ex)
-                .isInstanceOf(ResponseStatusException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Akun diblokir");
     }
 
@@ -200,7 +199,7 @@ class LoginOtpServiceTest {
         var ex = catchThrowable(() -> loginOtpService.verifyOtp(req));
 
         assertThat(ex)
-                .isInstanceOf(ResponseStatusException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("OTP expired atau tidak ditemukan");
 
     }
