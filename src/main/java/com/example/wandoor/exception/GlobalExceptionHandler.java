@@ -67,9 +67,7 @@ public class GlobalExceptionHandler {
             body.put("message", ex.getReason());
             body.put("timestamp", Instant.now().toString());
             body.put("traceId", MDC.get("traceId"));
-            body.put("requestId", MDC.get("requestId"));
-            body.put("traceId", MDC.get("traceId"));
-            body.put("requestId", MDC.get("requestId"));
+            body.put("requestId", MDC.get("requestId"));;
             
             return ResponseEntity.status(ex.getStatusCode()).body(body);
         }
