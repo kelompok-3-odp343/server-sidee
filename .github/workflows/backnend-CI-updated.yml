@@ -1,0 +1,105 @@
+name: CI/CD for Spring Boot Docker App
+
+on:
+  push:
+    branches: ["staging"] # Ganti dengan nama branch yang Anda gunakan untuk production, misalnya 'main' atau 'master'
+  pull_request:
+    branches: ["staging"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      oracle:
+        image: gvenzl/oracle-xe:21-slim
+        ports:
+          - 1521:1521
+        env:
+          ORACLE_PASSWORD: password
+        options: >-
+          --health-cmd="echo 'select 1 from dual;' | sqlplus -s system/password@localhost:1521/XEPDB1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      # Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Setup JDK untuk build aplikasi Spring Boot
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: "17"
+          distribution: "zulu"
+
+      # Memberikan izin eksekusi pada gradlew
+      - name: Give execute permission to gradlew
+        run: ./gradlew clean build
+
+      # Tunggu Oracle Database siap (listener aktif)
+      - name: Wait for Oracle DB to be ready
+        run: |
+          echo "Waiting for Oracle DB to start..."
+          for i in {1..30}; do
+            nc -z localhost 1521 && echo "Oracle is ready!" && break
+            echo "Still waiting..."
+            sleep 10
+          done
+
+      # Set environment variable agar Spring Boot connect ke Oracle container
+      - name: Set environment variables
+        run: |
+          echo "SPRING_DATASOURCE_URL=${{secrets.SPRING_DATASOURCE_URL}}" >> $GITHUB_ENV
+          echo "SPRING_DATASOURCE_USERNAME=${{secrets.SPRING_DATASOURCE_USERNAME}}" >> $GITHUB_ENV
+          echo "SPRING_DATASOURCE_PASSWORD=${{secrets.SPRING_DATASOURCE_PASSWORD}}" >> $GITHUB_ENV
+
+      # Build dengan Gradle (bisa tambahkan test jika ingin uji koneksi DB)
+      - name: Build with Gradle
+        run: ./gradlew clean build -x test
+
+      # Log in to DockerHub
+      - name: Log in to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build dan Push image ke Docker Hub
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: |
+            jrtr1/wandoor-backend-app:backend-${{ github.sha }}
+            jrtr1/wandoor-backend-app:backend-latest
+
+      # === Find & Replace image tag di repo infra ===
+      - name: Checkout infra repository
+        uses: actions/checkout@v3
+        with:
+          repository: kelompok-3-odp343/infra
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: infra
+
+      - name: Update image tag in backend deployment
+        run: |
+          cd infra/k3s/backend
+          sed -i "s|jrtr1/wandoor-backend-app:.*|jrtr1/wandoor-backend-app:backend-${{ github.sha }}|g" deployment.yaml
+
+      - name: Commit and push updated image tag
+        run: |
+          cd infra
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Update backend image tag to backend-${{ github.sha }}"
+          git push origin main
