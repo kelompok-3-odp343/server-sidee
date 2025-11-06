@@ -8,7 +8,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
-
 import org.slf4j.MDC;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
@@ -25,10 +24,10 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
     private final JwtUtils jwtUtils;
     private final RequestContext requestContext;
     private final StringRedisTemplate stringRedisTemplate;
-
 
     @Override
     protected void doFilterInternal(HttpServletRequest req,
@@ -38,58 +37,63 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String path = req.getRequestURI();
 
+        // Lewati JWT Filter untuk endpoint auth
         if (path.startsWith("/api/auth/")) {
-            System.out.println("JWT Filter skipped for: " + path);
             filterChain.doFilter(req, response);
             return;
         }
 
         var header = req.getHeader("Authorization");
-        var userIdHeader = req.getHeader("User-Id");
-        var cifHeader = req.getHeader("Customer-Id");
 
-        if (header == null || !header.startsWith("Bearer ")){
+        if (header == null || !header.startsWith("Bearer ")) {
             unauthorized(response, "Unauthorized - Token JWT tidak valid");
             return;
         }
 
-        if (userIdHeader == null || cifHeader == null) {
-            unauthorized(response, "Unauthorized - Missing userId or cif header");
-            return;
-        }
-
-        MDC.put("userId", userIdHeader);
-        MDC.put("cif", cifHeader);
-
         var token = header.substring(7);
+
         try {
+            // Check token blacklist
             var blacklistKey = "jwt_blacklist:" + token;
             if (stringRedisTemplate.hasKey(blacklistKey)) {
                 unauthorized(response, "Unauthorized - Token sudah logout");
                 return;
             }
 
+            // Validate JWT
             var jwt = jwtUtils.validateToken(token);
-//            log.info("✅ JWT valid untuk subject={}", jwt.getSubject());
-            var userId = jwt.getSubject();
+            var userId = jwt.getSubject(); // ✅ USER_ID DIAMBIL DARI JWT
             var role = jwt.getClaim("role").asString();
 
-            var auth = new UsernamePasswordAuthenticationToken(userId, null, List.of(() -> "ROLE_" + role));
+            // Ambil CIF dari header (untuk nasabah)
+            var cifHeader = req.getHeader("Customer-Id");
+
+            // ✅ VALIDASI ROLE
+            if (!"ADMIN".equalsIgnoreCase(role)) {
+                // Nasabah wajib memiliki CIF
+                if (cifHeader == null || cifHeader.isBlank()) {
+                    unauthorized(response, "Unauthorized - Missing Customer-Id for non-admin user");
+                    return;
+                }
+            }
+
+            // MDC Logging
+            MDC.put("userId", userId);
+            MDC.put("cif", cifHeader);
+
+            // Setup Authentication context
+            var auth = new UsernamePasswordAuthenticationToken(
+                    userId, null, List.of(() -> "ROLE_" + role)
+            );
             auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(req));
             SecurityContextHolder.getContext().setAuthentication(auth);
 
-            // simpan ke context global
+            // ✅ Set RequestContext (SUPAYA SERVICE DAPAT ADMIN USER ID)
             RequestContext ctx = RequestContext.get();
-            ctx.setUserId(userIdHeader);
+            ctx.setUserId(userId);   // Ambil dari JWT, bukan dari header
             ctx.setCif(cifHeader);
 
-                filterChain.doFilter(req, response);
-
-//            try{
-//            } finally {
-//                RequestContext.clear();
-//                SecurityContextHolder.clearContext();
-//            }
+            filterChain.doFilter(req, response);
 
         } catch (Exception e) {
             log.error("❌ Error di JwtAuthenticationFilter: {}", e.getMessage(), e);
@@ -99,7 +103,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private void unauthorized(HttpServletResponse res, String msg) throws IOException {
-        if (res.isCommitted()) return;;
+        if (res.isCommitted()) return;
         res.resetBuffer();
         res.setStatus(HttpStatus.UNAUTHORIZED.value());
         res.setCharacterEncoding("UTF-8");
