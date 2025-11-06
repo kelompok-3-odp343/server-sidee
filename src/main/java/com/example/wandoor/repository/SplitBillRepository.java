@@ -29,4 +29,15 @@ public interface SplitBillRepository extends JpaRepository<SplitBill, String> {
     """)
     BigDecimal sumTotalBillByCreator(@Param("userId") String userId, @Param("cif") String cif);
 
+    @Query("""
+        SELECT * FROM  SplitBill sb
+        JOIN sb.id ON SplitBillMember sbm
+        ON sb.id = sbm.splitBillId
+        WHERE sb.id = :splitBillId 
+        AND sbm.id = :memberId 
+        AND hasPaid = 0
+    """)
+    Optional<SplitBill> findUnpaidMember(@Param("splitBillId") String splitBillId, @Param("memberId") String memberId);
+
+
 }

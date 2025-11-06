@@ -5,6 +5,7 @@ import com.example.wandoor.exception.BusinessException;
 import com.example.wandoor.model.entity.SplitBill;
 import com.example.wandoor.model.entity.SplitBillMember;
 import com.example.wandoor.model.request.EditSplitBillRequest;
+import com.example.wandoor.model.request.PatchSplitBillRequest;
 import com.example.wandoor.model.request.SplitBillDetailRequest;
 import com.example.wandoor.model.response.AddNewSplitBillResponse;
 import com.example.wandoor.model.response.EditSplitBillResponse;
@@ -344,4 +345,38 @@ public class SplitBillService {
                     splitBillData.getId()
             );
     }
+
+    @Transactional
+    public void updateHaspaidSplitBill(PatchSplitBillRequest request) {
+            
+            try {
+                var userId = RequestContext.get().getUserId();
+                var cif = RequestContext.get().getCif();
+                profileRepository.findByIdAndCif(userId, cif)
+                        .orElseThrow(() -> {
+                                log.warn("User not found for cif={} and userId={}", cif, userId);
+                                return new BusinessException(HttpStatus.CONFLICT, "INVALID_USER", "User Not Found");    
+                        });
+
+                splitBillRepository.findUnpaidMember(request.splitBillId(), request.memberId())
+                        .orElseThrow(() -> {
+                                log.warn("Split Bill not found for splitBillId={} and memberId={}", request.splitBillId(), request.memberId());
+                                return new BusinessException(HttpStatus.CONFLICT, "INVALID_SPLIT_BILL", "No Such Split Bill or Member");
+                        });
+
+                int updated = splitBillMemberRepository.markAsPaid(request.splitBillId(), request.memberId());
+
+                if (updated == 0) {
+                        log.warn("Member update failed for splitBillId={} and memberId={}", request.splitBillId(), request.memberId());
+                        throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UPDATE_FAILED", "Failed to mark as paid");
+                        }        
+                } catch (ResponseStatusException e) {
+                        log.warn("Business error while fetching split bills: {}", e.getMessage());
+                        throw e;
+                        
+                } catch (Exception e) {
+                        log.error("Unexpected error fetching split bills", e);
+                        throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to fetch split bills");
+                }
+        }
 }
