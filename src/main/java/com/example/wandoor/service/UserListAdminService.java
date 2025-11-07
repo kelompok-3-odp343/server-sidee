@@ -14,59 +14,48 @@ public class UserListAdminService {
 
     public Map<String, Object> getAllUsersList(String userIdHeader) {
 
-        // ✅ 1. Validasi role
         String userRole = repository.findRoleByUserId(userIdHeader);
-
-        if (userRole == null) {
-            return Map.of(
-                "message", "User tidak ditemukan",
-                "status", false,
-                "data", List.of()
-            );
-        }
-
         if (!"ADMIN".equalsIgnoreCase(userRole)) {
             return Map.of(
-                "message", "Forbidden - Anda bukan admin",
                 "status", false,
-                "data", List.of()
+                "message", "Forbidden - Anda bukan admin"
             );
         }
-
-        // ✅ 2. Ambil semua user dengan role NASABAH
+    
+        // ✅ Ambil summary
+        Object[] summary = repository.getUserSummary().get(0);
+    
+        // ✅ Ambil list user
         List<Object[]> users = repository.findAllNasabahUserList();
-
-        List<Map<String, Object>> dataList = new ArrayList<>();
+    
+        List<Map<String, Object>> userList = new ArrayList<>();
         for (Object[] row : users) {
-            Map<String, Object> map = new LinkedHashMap<>();
-            map.put("userId", row[0]);
-            map.put("customerId", row[1]);
-            map.put("customerName", row[2]);
-            map.put("countAccount", row[3]);
-            map.put("isBlocked", parseBlocked(row[4]));
-            dataList.add(map);
+            userList.add(Map.of(
+                "userId", row[0],
+                "customerId", row[1],
+                "customerName", row[2],
+                "countAccount", row[3],
+                "isBlocked", row[4]
+            ));
         }
-
-        // ✅ 3. Kembalikan response
+    
         return Map.of(
-            "message", "Users list fetched successfully",
             "status", true,
-            "data", dataList
+            "message", "Success",
+            "totalUsers", summary[0],
+            "activeUsers", summary[1],
+            "blockedUsers", summary[2],
+            "avgAccountPerUser", summary[3],
+            "users", userList
         );
     }
+    
 
-    private boolean parseBlocked(Object val) {
-        if (val == null) return false;
-        if (val instanceof Boolean b) return b;
-        if (val instanceof Number n) return n.intValue() == 1;
-        if (val instanceof String s) return s.equals("1") || s.equalsIgnoreCase("true");
-        return false;
+    private boolean parseBoolean(Object val) {
+        return val instanceof Boolean b ? b : Integer.parseInt(val.toString()) == 1;
     }
 
-    private String buildFullName(String first, String middle, String last) {
-        return String.join(" ",
-                Optional.ofNullable(first).orElse(""),
-                Optional.ofNullable(middle).orElse(""),
-                Optional.ofNullable(last).orElse("")).trim().replaceAll(" +", " ");
+    private String cleanName(String name) {
+        return name.trim().replaceAll(" +", " ");
     }
 }

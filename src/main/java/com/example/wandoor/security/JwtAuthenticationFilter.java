@@ -8,7 +8,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
-
 import org.slf4j.MDC;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
@@ -25,86 +24,84 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
     private final JwtUtils jwtUtils;
     private final RequestContext requestContext;
     private final StringRedisTemplate stringRedisTemplate;
 
-
     @Override
     protected void doFilterInternal(HttpServletRequest req,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain)
+                                    HttpServletResponse res,
+                                    FilterChain chain)
             throws ServletException, IOException {
 
         String path = req.getRequestURI();
 
+        // Skip auth endpoints
         if (path.startsWith("/api/auth/")) {
-            System.out.println("JWT Filter skipped for: " + path);
-            filterChain.doFilter(req, response);
+            chain.doFilter(req, res);
             return;
         }
 
-        var header = req.getHeader("Authorization");
-        var userIdHeader = req.getHeader("User-Id");
-        var cifHeader = req.getHeader("Customer-Id");
-
-        if (header == null || !header.startsWith("Bearer ")){
-            unauthorized(response, "Unauthorized - Token JWT tidak valid");
+        String authHeader = req.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            unauthorized(res, "Unauthorized: Missing or invalid Authorization header");
             return;
         }
 
-        if (userIdHeader == null || cifHeader == null) {
-            unauthorized(response, "Unauthorized - Missing userId or cif header");
-            return;
-        }
+        String token = authHeader.substring(7);
 
-        MDC.put("userId", userIdHeader);
-        MDC.put("cif", cifHeader);
-
-        var token = header.substring(7);
         try {
-            var blacklistKey = "jwt_blacklist:" + token;
+            // Check Redis blacklist (logout)
+            String blacklistKey = "jwt_blacklist:" + token;
             if (stringRedisTemplate.hasKey(blacklistKey)) {
-                unauthorized(response, "Unauthorized - Token sudah logout");
+                unauthorized(res, "Unauthorized: Token has been logged out");
                 return;
             }
 
             var jwt = jwtUtils.validateToken(token);
-//            log.info("✅ JWT valid untuk subject={}", jwt.getSubject());
-            var userId = jwt.getSubject();
-            var role = jwt.getClaim("role").asString();
+            String userId = jwt.getSubject();
+            String role = jwt.getClaim("role").asString();
 
-            var auth = new UsernamePasswordAuthenticationToken(userId, null, List.of(() -> "ROLE_" + role));
-            auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(req));
-            SecurityContextHolder.getContext().setAuthentication(auth);
+            // Nasabah MUST send Customer-Id header
+            String cifHeader = req.getHeader("Customer-Id");
+            if (!"ADMIN".equalsIgnoreCase(role) && cifHeader == null) {
+                unauthorized(res, "Unauthorized: Missing Customer-Id for NASABAH");
+                return;
+            }
 
-            // simpan ke context global
+            // Put into Spring Security Context
+            var authToken = new UsernamePasswordAuthenticationToken(
+                    userId, null, List.of(() -> "ROLE_" + role)
+            );
+            authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(req));
+            SecurityContextHolder.getContext().setAuthentication(authToken);
+
+            // Store in RequestContext (to be used in services)
             RequestContext ctx = RequestContext.get();
-            ctx.setUserId(userIdHeader);
-            ctx.setCif(cifHeader);
+            ctx.setUserId(userId);
+            ctx.setCif(cifHeader); // null allowed for admin
 
-                filterChain.doFilter(req, response);
+            // Logging context
+            MDC.put("userId", userId);
+            MDC.put("cif", cifHeader);
 
-//            try{
-//            } finally {
-//                RequestContext.clear();
-//                SecurityContextHolder.clearContext();
-//            }
+            chain.doFilter(req, res);
 
         } catch (Exception e) {
-            log.error("❌ Error di JwtAuthenticationFilter: {}", e.getMessage(), e);
+            log.error("❌ JWT Filtering Error: {}", e.getMessage(), e);
             SecurityContextHolder.clearContext();
-            unauthorized(response, "Unauthorized - Token JWT tidak valid");
+            unauthorized(res, "Unauthorized: Invalid JWT token");
         }
     }
 
-    private void unauthorized(HttpServletResponse res, String msg) throws IOException {
-        if (res.isCommitted()) return;;
+
+    private void unauthorized(HttpServletResponse res, String message) throws IOException {
+        if (res.isCommitted()) return;
         res.resetBuffer();
         res.setStatus(HttpStatus.UNAUTHORIZED.value());
-        res.setCharacterEncoding("UTF-8");
         res.setContentType("application/json");
-        res.getWriter().write("{\"status\":false,\"message\":\"" + msg + "\"}");
+        res.getWriter().write("{\"status\":false,\"message\":\"" + message + "\"}");
         res.flushBuffer();
     }
 }
