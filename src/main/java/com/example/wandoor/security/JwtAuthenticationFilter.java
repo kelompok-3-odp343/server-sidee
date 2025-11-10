@@ -45,21 +45,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         var header = req.getHeader("Authorization");
-        var userIdHeader = req.getHeader("User-Id");
-        var cifHeader = req.getHeader("Customer-Id");
-
         if (header == null || !header.startsWith("Bearer ")){
             unauthorized(response, "Unauthorized - Token JWT tidak valid");
             return;
         }
 
-        if (userIdHeader == null || cifHeader == null) {
-            unauthorized(response, "Unauthorized - Missing userId or cif header");
-            return;
-        }
-
-        MDC.put("userId", userIdHeader);
-        MDC.put("cif", cifHeader);
+//        if (userIdHeader == null || cifHeader == null) {
+//            unauthorized(response, "Unauthorized - Missing userId or cif header");
+//            return;
+//        }
 
         var token = header.substring(7);
         try {
@@ -70,31 +64,38 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
 
             var jwt = jwtUtils.validateToken(token);
-//            log.info("✅ JWT valid untuk subject={}", jwt.getSubject());
-            var userId = jwt.getSubject();
+            var userId = jwt.getClaim("userId").asString();
             var role = jwt.getClaim("role").asString();
+            var cif = jwt.getClaim("cif").asString();
+            //TODO Add NPP for Admin
 
-            var auth = new UsernamePasswordAuthenticationToken(userId, null, List.of(() -> "ROLE_" + role));
-            auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(req));
-            SecurityContextHolder.getContext().setAuthentication(auth);
+            if (!"NASABAH".equalsIgnoreCase(role)) cif = null;
+
+            MDC.put("userId", userId);
+            if (cif != null) MDC.put("cif", cif);
+
+            if (SecurityContextHolder.getContext().getAuthentication() == null){
+                var auth = new UsernamePasswordAuthenticationToken(userId, null, List.of(() -> "ROLE_" + role));
+                auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(req));
+                SecurityContextHolder.getContext().setAuthentication(auth);
+            }
 
             // simpan ke context global
             RequestContext ctx = RequestContext.get();
-            ctx.setUserId(userIdHeader);
-            ctx.setCif(cifHeader);
+            ctx.setUserId(userId);
+            ctx.setCif(cif);
 
-                filterChain.doFilter(req, response);
+            log.info("🔐 Authenticated user={} role={} cif={}", userId, role, cif != null ? cif : "-");
 
-//            try{
-//            } finally {
-//                RequestContext.clear();
-//                SecurityContextHolder.clearContext();
-//            }
+            filterChain.doFilter(req, response);
 
         } catch (Exception e) {
             log.error("❌ Error di JwtAuthenticationFilter: {}", e.getMessage(), e);
             SecurityContextHolder.clearContext();
             unauthorized(response, "Unauthorized - Token JWT tidak valid");
+        } finally {
+            MDC.remove("userId");
+            MDC.remove("cif");
         }
     }
 

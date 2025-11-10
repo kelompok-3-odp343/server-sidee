@@ -1,11 +1,14 @@
 package com.example.wandoor.service;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import com.example.wandoor.exception.BusinessException;
+import com.example.wandoor.model.entity.UserAuth;
+import com.example.wandoor.model.enums.UserRole;
 import com.example.wandoor.model.request.*;
 import com.example.wandoor.model.response.*;
 import com.example.wandoor.util.OtpGuards;
@@ -83,34 +86,26 @@ public class LoginOtpService {
                 throw new BusinessException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Username atau Password salah");
             }
 
-            stringRedisTemplate.delete("otp:login_failed:" + req.username());
+            var role = roleManagementRepository.findById(userAuth.getRoleId())
+                    .map(RoleManagement::getRoleName)
+                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "ROLE_NOT_FOUND", "role not found"));
 
-            var sessionId = UUID.randomUUID().toString();
-            var otp = OtpGuards.generateNumericOtp();
+            var roleEnum = UserRole.from(role);
 
-            var otpSessionKey = "otp:session:" + sessionId;
-            Map<String, String> otpData = Map.of(
-                    "userId", userAuth.getUserId(),
-                    "username", userAuth.getUsername(),
-                    "email", userAuth.getEmailAddress(),
-                    "otp", otp
-            );
-            stringRedisTemplate.opsForHash().putAll(otpSessionKey, otpData);
-            stringRedisTemplate.expire(otpSessionKey, OTP_TTL);
+            switch (roleEnum) {
+                case NASABAH -> { return doNasabahLogin(userAuth); }
+                case MAKER, CHECKER, APPROVAL -> {
+                    Map<String, Object> claims = new HashMap<>();
+                    claims.put("role", roleEnum.name());
+                    claims.put("username", userAuth.getUsername());
+                    claims.put("email", userAuth.getEmailAddress());
+                    String token = jwtUtils.generateToken(claims, userAuth.getUserId());
+                    stringRedisTemplate.opsForValue().set("session:admin:" + userAuth.getUserId(), token, TOKEN_TTL);
+                    return new LoginResponse(true, "Login berhasil sebagai " + roleEnum.name(),  token);
+                }
+                default -> throw new BusinessException(HttpStatus.FORBIDDEN, "ROLE_NOT_ALLOWED", "Role tidak diizinkan login");
+            }
 
-
-            var profile = profileRepository.findById(userAuth.getUserId())
-                    .orElseThrow(() -> new BusinessException(HttpStatus.UNAUTHORIZED, "PROFILE_NOT_FOUND", "Profile tidak ditemukan"));
-            var emailTo = userAuth.getEmailAddress() != null
-                    ? userAuth.getEmailAddress()
-                    : profile.getEmailAddress();
-
-            // sent OTP by email
-            emailService.sendOtp(emailTo, otp);
-
-            log.info("OTP {} dikirim ke {} | session={} TTL={}m", otp, userAuth.getEmailAddress(), sessionId, OTP_TTL.toMinutes());
-
-            return new LoginResponse(true, "Kode OTP telah dikirim ke email Anda", sessionId);
 
         } catch (BusinessException e) {
             throw e;
@@ -168,13 +163,17 @@ public class LoginOtpService {
 
             var userData = userAuthRepository.findById(userId)
                     .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "USER_NOT_FOUND" , "user not found"));
-            var role = roleManagementRepository.findFirstById(userData.getRoleId())
+            var role = roleManagementRepository.findById(userData.getRoleId())
                     .map(RoleManagement::getRoleName)
-                    .orElse("NASABAH");
+                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "ROLE_NOT_FOUND", "Role tidak ditemukan"));
             var profile = profileRepository.findById(userId)
                     .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "PROFILE_NOT_FOUND" , "profile not found"));
 
-            var token = jwtUtils.generateToken(userId, role);
+            Map<String, Object> claims = new HashMap<>();
+            claims.put("role", role);
+            claims.put("username", userData.getUsername());
+            claims.put("cif", profile.getCif());
+            var token = jwtUtils.generateToken(claims, userData.getUserId());
 
             var sessionKey = "session:" + req.sessionId();
             stringRedisTemplate.opsForValue().set(sessionKey, token, TOKEN_TTL);
@@ -384,6 +383,43 @@ public class LoginOtpService {
             throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UNEXPECTED_ERROR", "Something went wrong while reset password", e);
         }
 
+    }
+
+    private LoginResponse doNasabahLogin(UserAuth userAuth){
+        try{
+            stringRedisTemplate.delete("otp:login_failed:" + userAuth.getUsername());
+
+            var sessionId = UUID.randomUUID().toString();
+            var otp = OtpGuards.generateNumericOtp();
+
+            var otpSessionKey = "otp:session:" + sessionId;
+            Map<String, String> otpData = Map.of(
+                    "userId", userAuth.getUserId(),
+                    "username", userAuth.getUsername(),
+                    "email", userAuth.getEmailAddress(),
+                    "otp", otp
+            );
+            stringRedisTemplate.opsForHash().putAll(otpSessionKey, otpData);
+            stringRedisTemplate.expire(otpSessionKey, OTP_TTL);
+
+
+            var profile = profileRepository.findById(userAuth.getUserId())
+                    .orElseThrow(() -> new BusinessException(HttpStatus.UNAUTHORIZED, "PROFILE_NOT_FOUND", "Profile tidak ditemukan"));
+            var emailTo = userAuth.getEmailAddress() != null
+                    ? userAuth.getEmailAddress()
+                    : profile.getEmailAddress();
+
+            // sent OTP by email
+            emailService.sendOtp(emailTo, otp);
+
+            log.info("OTP {} dikirim ke {} | session={} TTL={}m", otp, userAuth.getEmailAddress(), sessionId, OTP_TTL.toMinutes());
+
+            return new LoginResponse(true, "Kode OTP telah dikirim ke email Anda", sessionId);
+        } catch (BusinessException e){
+            throw e;
+        } catch (Exception e) {
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UNEXPECTED_ERROR", "Something went wrong while login", e);
+        }
     }
 
 

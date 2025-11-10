@@ -77,7 +77,13 @@ class LoginOtpServiceTest {
         var profile = new Profile();
         profile.setId("U001");
         profile.setEmailAddress("oktaviaqa@example.com");
-        when(profileRepository.findById("U001")).thenReturn(Optional.of(profile));
+        lenient().when(profileRepository.findById("U001")).thenReturn(Optional.of(profile));
+
+        var role = new RoleManagement();
+        role.setId("R001");
+        role.setRoleName("NASABAH");
+        lenient().when(roleManagementRepository.findById(any()))
+                .thenReturn(Optional.of(role));
 
         lenient().when(stringRedisTemplate.hasKey(anyString())).thenReturn(false);
         lenient().when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -91,7 +97,7 @@ class LoginOtpServiceTest {
 
         assertThat(response.status()).isTrue();
         assertThat(response.message()).contains("Kode OTP");
-        assertThat(response.sessionId()).isNotNull();
+        assertThat(response.sessionIdOrToken()).isNotNull();
 
         verify(emailService, times(1)).sendOtp(eq("oktaviaqa@example.com"), anyString());
     }
@@ -144,6 +150,10 @@ class LoginOtpServiceTest {
         var otpId = UUID.randomUUID().toString();
         var req = new VerifyOtpRequest(otpId, "654321");
 
+        var role = new RoleManagement();
+        role.setId("R001");
+        role.setRoleName("NASABAH");
+
         var otpVerification = OtpVerification.builder()
                 .id(otpId)
                 .otpCode("654321")
@@ -166,11 +176,11 @@ class LoginOtpServiceTest {
         lenient().when(userOtpVerificationRepository.consumeIfValid(anyString(), anyString(), any())).thenReturn(1);
         lenient().when(userAuthRepository.findById("U001"))
                 .thenReturn(Optional.of(new UserAuth("U001", "oktaviaqa", null, null, null, 0)));
-        lenient().when(roleManagementRepository.findFirstById(any()))
-                .thenReturn(Optional.of(new RoleManagement()));
+        lenient().when(roleManagementRepository.findById(any()))
+                .thenReturn(Optional.of(role));
 
         lenient().when(profileRepository.findById("U001")).thenReturn(Optional.of(profile));
-        lenient().when(jwtUtils.generateToken(anyString(), anyString())).thenReturn("jwt_token");
+        lenient().when(jwtUtils.generateToken(anyMap(), anyString())).thenReturn("jwt_token");
 
         lenient().when(stringRedisTemplate.opsForHash()).thenReturn((HashOperations) hashOperations);
         lenient().when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
