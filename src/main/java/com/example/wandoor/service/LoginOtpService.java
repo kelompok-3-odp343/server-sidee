@@ -100,7 +100,8 @@ public class LoginOtpService {
                     claims.put("username", userAuth.getUsername());
                     claims.put("email", userAuth.getEmailAddress());
                     String token = jwtUtils.generateToken(claims, userAuth.getUserId());
-                    return new LoginResponse(true, "Login berhasil sebagai " + role,  token);
+                    stringRedisTemplate.opsForValue().set("session:admin:" + userAuth.getUserId(), token, TOKEN_TTL);
+                    return new LoginResponse(true, "Login berhasil sebagai " + roleEnum.name(),  token);
                 }
                 default -> throw new BusinessException(HttpStatus.FORBIDDEN, "ROLE_NOT_ALLOWED", "Role tidak diizinkan login");
             }
