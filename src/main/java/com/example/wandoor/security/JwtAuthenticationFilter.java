@@ -70,7 +70,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
 
             var jwt = jwtUtils.validateToken(token);
-//            log.info("✅ JWT valid untuk subject={}", jwt.getSubject());
             var userId = jwt.getSubject();
             var role = jwt.getClaim("role").asString();
 
