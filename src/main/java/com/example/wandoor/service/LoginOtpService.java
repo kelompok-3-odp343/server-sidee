@@ -8,6 +8,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.example.wandoor.exception.BusinessException;
 import com.example.wandoor.model.entity.UserAuth;
+import com.example.wandoor.model.enums.UserRole;
 import com.example.wandoor.model.request.*;
 import com.example.wandoor.model.response.*;
 import com.example.wandoor.util.OtpGuards;
@@ -89,14 +90,21 @@ public class LoginOtpService {
                     .map(RoleManagement::getRoleName)
                     .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "ROLE_NOT_FOUND", "role not found"));
 
-            if ("NASABAH".equalsIgnoreCase(role)) return doNasabahLogin(userAuth);
+            var roleEnum = UserRole.from(role);
 
-            Map<String, Object> claims = new HashMap<>();
-            claims.put("role", role);
-            claims.put("userid", userAuth.getUserId());
+            switch (roleEnum) {
+                case NASABAH -> { return doNasabahLogin(userAuth); }
+                case MAKER, CHECKER, APPROVAL -> {
+                    Map<String, Object> claims = new HashMap<>();
+                    claims.put("role", roleEnum.name());
+                    claims.put("username", userAuth.getUsername());
+                    claims.put("email", userAuth.getEmailAddress());
+                    String token = jwtUtils.generateToken(claims, userAuth.getUserId());
+                    return new LoginResponse(true, "Login berhasil sebagai " + role,  token);
+                }
+                default -> throw new BusinessException(HttpStatus.FORBIDDEN, "ROLE_NOT_ALLOWED", "Role tidak diizinkan login");
+            }
 
-            var token = jwtUtils.generateToken(claims, userAuth.getUserId());
-            return new LoginResponse(true, "Login berhasil", token);
 
         } catch (BusinessException e) {
             throw e;
@@ -164,7 +172,7 @@ public class LoginOtpService {
             claims.put("role", role);
             claims.put("username", userData.getUsername());
             claims.put("cif", profile.getCif());
-            var token = jwtUtils.generateToken(claims, role);
+            var token = jwtUtils.generateToken(claims, userData.getUserId());
 
             var sessionKey = "session:" + req.sessionId();
             stringRedisTemplate.opsForValue().set(sessionKey, token, TOKEN_TTL);

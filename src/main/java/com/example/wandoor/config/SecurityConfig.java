@@ -25,9 +25,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**", "/error").permitAll()
-                        .requestMatchers("/api/approval/**").hasRole("APPROVAL")
-                        .requestMatchers("/api/checker/**").hasRole("CHECKER")
-                        .requestMatchers("/api/maker/**").hasRole("MAKER")
+                        .requestMatchers("/api/admin/**").hasAnyRole("MAKER", "CHECKER", "APPROVAL")
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

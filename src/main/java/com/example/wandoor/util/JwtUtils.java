@@ -20,20 +20,9 @@ public class JwtUtils {
     @Value("${app.jwt.expiration-ms:3600000}")
     private long jwtExperiatonMs;
 
-//    public String generateToken(String userId, String role){
-//        var algorithm = Algorithm.HMAC256(jwtSecret.getBytes(StandardCharsets.UTF_8));
-//        return JWT.create()
-//                .withSubject(userId)
-//                .withClaim("role", role)
-////                .withClaim("cif", cif)
-//                .withIssuedAt(new Date())
-//                .withExpiresAt(new Date(System.currentTimeMillis() + jwtExperiatonMs))
-//                .sign(algorithm);
-//    }
-
     public String generateToken(Map<String, Object> claims, String userId) {
         var algorithm = Algorithm.HMAC256(jwtSecret.getBytes(StandardCharsets.UTF_8));
-        var builder = JWT.create().withSubject(userId);
+        var builder = JWT.create().withClaim("userId", userId);
         claims.forEach((k, v) -> builder.withClaim(k, v.toString()));
         builder.withIssuedAt(new Date())
                 .withExpiresAt(new Date(System.currentTimeMillis() + jwtExperiatonMs));
