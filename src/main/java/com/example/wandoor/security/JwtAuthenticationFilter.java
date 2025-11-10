@@ -8,7 +8,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
-
 import org.slf4j.MDC;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
@@ -25,10 +24,10 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
     private final JwtUtils jwtUtils;
     private final RequestContext requestContext;
     private final StringRedisTemplate stringRedisTemplate;
-
 
     @Override
     protected void doFilterInternal(HttpServletRequest req,
@@ -38,8 +37,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String path = req.getRequestURI();
 
+        // Lewati JWT Filter untuk endpoint auth
         if (path.startsWith("/api/auth/")) {
-            System.out.println("JWT Filter skipped for: " + path);
             filterChain.doFilter(req, response);
             return;
         }
@@ -56,13 +55,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 //        }
 
         var token = header.substring(7);
+
         try {
+            // Check token blacklist
             var blacklistKey = "jwt_blacklist:" + token;
             if (stringRedisTemplate.hasKey(blacklistKey)) {
                 unauthorized(response, "Unauthorized - Token sudah logout");
                 return;
             }
 
+            // Validate JWT
             var jwt = jwtUtils.validateToken(token);
             var userId = jwt.getClaim("userId").asString();
             var role = jwt.getClaim("role").asString();
@@ -80,7 +82,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().setAuthentication(auth);
             }
 
-            // simpan ke context global
+            // ✅ Set RequestContext (SUPAYA SERVICE DAPAT ADMIN USER ID)
             RequestContext ctx = RequestContext.get();
             ctx.setUserId(userId);
             ctx.setCif(cif);
@@ -100,7 +102,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private void unauthorized(HttpServletResponse res, String msg) throws IOException {
-        if (res.isCommitted()) return;;
+        if (res.isCommitted()) return;
         res.resetBuffer();
         res.setStatus(HttpStatus.UNAUTHORIZED.value());
         res.setCharacterEncoding("UTF-8");
