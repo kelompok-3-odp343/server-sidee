@@ -44,11 +44,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         var header = req.getHeader("Authorization");
-
-        if (header == null || !header.startsWith("Bearer ")) {
+        if (header == null || !header.startsWith("Bearer ")){
             unauthorized(response, "Unauthorized - Token JWT tidak valid");
             return;
         }
+
+//        if (userIdHeader == null || cifHeader == null) {
+//            unauthorized(response, "Unauthorized - Missing userId or cif header");
+//            return;
+//        }
 
         var token = header.substring(7);
 
@@ -62,36 +66,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             // Validate JWT
             var jwt = jwtUtils.validateToken(token);
-            var userId = jwt.getSubject(); // ✅ USER_ID DIAMBIL DARI JWT
+            var userId = jwt.getClaim("userId").asString();
             var role = jwt.getClaim("role").asString();
+            var cif = jwt.getClaim("cif").asString();
+            //TODO Add NPP for Admin
 
-            // Ambil CIF dari header (untuk nasabah)
-            var cifHeader = req.getHeader("Customer-Id");
+            if (!"NASABAH".equalsIgnoreCase(role)) cif = null;
 
-            // ✅ VALIDASI ROLE
-            if (!"ADMIN".equalsIgnoreCase(role)) {
-                // Nasabah wajib memiliki CIF
-                if (cifHeader == null || cifHeader.isBlank()) {
-                    unauthorized(response, "Unauthorized - Missing Customer-Id for non-admin user");
-                    return;
-                }
-            }
-
-            // MDC Logging
             MDC.put("userId", userId);
-            MDC.put("cif", cifHeader);
+            if (cif != null) MDC.put("cif", cif);
 
-            // Setup Authentication context
-            var auth = new UsernamePasswordAuthenticationToken(
-                    userId, null, List.of(() -> "ROLE_" + role)
-            );
-            auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(req));
-            SecurityContextHolder.getContext().setAuthentication(auth);
+            if (SecurityContextHolder.getContext().getAuthentication() == null){
+                var auth = new UsernamePasswordAuthenticationToken(userId, null, List.of(() -> "ROLE_" + role));
+                auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(req));
+                SecurityContextHolder.getContext().setAuthentication(auth);
+            }
 
             // ✅ Set RequestContext (SUPAYA SERVICE DAPAT ADMIN USER ID)
             RequestContext ctx = RequestContext.get();
-            ctx.setUserId(userId);   // Ambil dari JWT, bukan dari header
-            ctx.setCif(cifHeader);
+            ctx.setUserId(userId);
+            ctx.setCif(cif);
+
+            log.info("🔐 Authenticated user={} role={} cif={}", userId, role, cif != null ? cif : "-");
 
             filterChain.doFilter(req, response);
 
@@ -99,6 +95,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             log.error("❌ Error di JwtAuthenticationFilter: {}", e.getMessage(), e);
             SecurityContextHolder.clearContext();
             unauthorized(response, "Unauthorized - Token JWT tidak valid");
+        } finally {
+            MDC.remove("userId");
+            MDC.remove("cif");
         }
     }
 
