@@ -17,6 +17,7 @@ import com.example.wandoor.config.RequestContext;
 import com.example.wandoor.exception.BusinessException;
 import com.example.wandoor.model.entity.Account;
 import com.example.wandoor.model.entity.TrxHistory;
+import com.example.wandoor.model.enums.AccountStatus;
 import com.example.wandoor.model.enums.ProductType;
 import com.example.wandoor.model.request.SavingsRequest;
 import com.example.wandoor.model.response.SavingsResponse;
@@ -45,174 +46,206 @@ public class SavingsService {
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
     private static final DateTimeFormatter ISO_DATETIME_WITH_ZONE = DateTimeFormatter.ISO_DATE_TIME;
 
-    /**
-     * Endpoint utama untuk mendapatkan detail tabungan
-     */
+    // Keyword → category (ref_id)
+    private static final Map<String, String> DESCRIPTION_KEYWORDS = Map.ofEntries(
+            Map.entry("kopi", "REF_FOOD"),
+            Map.entry("coffee", "REF_FOOD"),
+            Map.entry("starbucks", "REF_FOOD"),
+            Map.entry("boba", "REF_FOOD"),
+            Map.entry("grabfood", "REF_FOOD"),
+            Map.entry("gofood", "REF_FOOD"),
+            Map.entry("resto", "REF_FOOD"),
+
+            Map.entry("baju", "REF_SHOPPING"),
+            Map.entry("kaos", "REF_SHOPPING"),
+            Map.entry("pakaian", "REF_SHOPPING"),
+            Map.entry("fashion", "REF_SHOPPING"),
+            Map.entry("tokopedia", "REF_SHOPPING"),
+            Map.entry("shopee", "REF_SHOPPING"),
+
+            Map.entry("grab", "REF_TRANSPORT"),
+            Map.entry("gojek", "REF_TRANSPORT"),
+            Map.entry("ojek", "REF_TRANSPORT"),
+            Map.entry("taxi", "REF_TRANSPORT"),
+
+            Map.entry("gaji", "REF_SALARY"),
+            Map.entry("salary", "REF_SALARY"),
+            Map.entry("payroll", "REF_SALARY"),
+
+            Map.entry("pln", "REF_BILLS"),
+            Map.entry("telkom", "REF_BILLS"),
+            Map.entry("wifi", "REF_BILLS"),
+            Map.entry("indihome", "REF_BILLS"),
+            Map.entry("pulsa", "REF_BILLS"),
+
+            Map.entry("netflix", "REF_ENTERTAINMENT"),
+            Map.entry("spotify", "REF_ENTERTAINMENT"),
+            Map.entry("youtube premium", "REF_ENTERTAINMENT")
+    );
+
+    private static final Map<String, String> PAYMENT_METHOD_KEYWORDS = Map.ofEntries(
+            Map.entry("QRIS", "REF_EWALLET"),
+            Map.entry("OVO", "REF_EWALLET"),
+            Map.entry("GOPAY", "REF_EWALLET"),
+            Map.entry("DANA", "REF_EWALLET"),
+            Map.entry("SHOPEEPAY", "REF_EWALLET")
+    );
+
     public SavingsResponse getSavingsDetail(SavingsRequest request) {
         try {
-            String userId = RequestContext.get().getUserId();
-            String cif = RequestContext.get().getCif();
-    
-            // ✅ Ambil profile berdasarkan userId
-            var profile = profileRepository.findById(userId)
-                    .orElseThrow(() -> new BusinessException(
-                            HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "User not found"
-                    ));
-    
-            // ✅ Validasi CIF sesuai token
-            if (profile.getCif() == null || !profile.getCif().equalsIgnoreCase(cif)) {
-                throw new BusinessException(HttpStatus.FORBIDDEN, "INVALID_CIF", "CIF does not match user access");
-            }
-    
-            // ✅ Ambil akun tabungan
-            List<Account> accounts = accountRepository.findByUserIdAndCifAndAccountType(userId, cif, ProductType.SVG);
+            final String userId = RequestContext.get().getUserId();
+            final String cif = RequestContext.get().getCif();
+
+            log.info("DEBUG-SAVING-1 | userId={} cif={} requestAccount={}", userId, cif,
+                    request != null ? request.getAccountNumber() : null);
+
+            // Validasi user
+            profileRepository.findByIdAndCif(userId, cif)
+                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "User not found"));
+
+            // Ambil akun SVG, tapi hanya status BUKA atau BARU
+            List<Account> accounts = accountRepository
+                    .findByUserIdAndCifAndAccountType(userId, cif, ProductType.SVG)
+                    .stream()
+                    .filter(a -> a.getAccountStatus() == AccountStatus.BUKA || a.getAccountStatus() == AccountStatus.BARU)
+                    .toList();
+
             if (accounts.isEmpty()) {
-                throw new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND" ,"No savings account found");
+                throw new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "No active savings account found");
             }
-    
-            Account selectedAccount = selectTargetAccount(request, accounts);
-    
-            List<TrxHistory> trxList = trxHistoryRepository.findByAccountNumber(selectedAccount.getAccountNumber());
+
+            Account selected = selectTargetAccountStrict(request, accounts);
+
+            List<TrxHistory> trxList = trxHistoryRepository.findByAccountNumber(selected.getAccountNumber());
+            log.info("DEBUG-SAVING-2 | trxCount={} account={}", trxList.size(), selected.getAccountNumber());
+
             if (trxList.isEmpty()) {
-                return buildEmptyResponse(selectedAccount);
+                return buildEmptyResponse(selected);
             }
-    
+
+            // Apply category classification before summary processing
+            trxList.forEach(t -> t.setRefId(resolveCategory(t)));
+
             Summary summary = calculateSummary(trxList);
             Insights insights = calculateInsights(trxList);
             List<CategoryBreakdown> breakdown = calculateCategoryBreakdown(trxList);
-            Meta meta = buildMeta(trxList, selectedAccount);
-    
+            Meta meta = buildMeta(trxList, selected);
+
             return new SavingsResponse(meta, summary, insights, breakdown.isEmpty() ? null : breakdown);
-    
+
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
+            log.error("🔥 REAL ERROR in getSavingsDetail: ", e);
             throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UNEXPECTED_ERROR",
-                "Something went wrong while retrieving savings detail data", e);
+                    "Something went wrong while retrieving savings detail data");
         }
     }
-    
-    
 
-    /**
-     * Pilih rekening target berdasarkan input user atau akun utama
-     */
-    private Account selectTargetAccount(SavingsRequest request, List<Account> accounts) {
-        return Optional.ofNullable(request)
-                .map(SavingsRequest::getAccountNumber)
-                .flatMap(accNum -> accounts.stream()
-                        .filter(a -> a.getAccountNumber().equals(accNum))
-                        .findFirst())
-                .orElseGet(() -> accounts.stream()
-                        .filter(a -> a.getIsMainAccount() != null && a.getIsMainAccount() == 1)
-                        .findFirst()
-                        .orElse(accounts.get(0)));
+    private String resolveCategory(TrxHistory trx) {
+        String desc = Optional.ofNullable(trx.getTransactionDescription()).orElse("").toLowerCase();
+        String party = Optional.ofNullable(trx.getPartyName()).orElse("").toLowerCase();
+        String method = Optional.ofNullable(trx.getPaymentMethod()).orElse("").toUpperCase();
+
+        for (var e : DESCRIPTION_KEYWORDS.entrySet()) {
+            if (desc.contains(e.getKey().toLowerCase())) return e.getValue();
+        }
+
+        for (var e : PAYMENT_METHOD_KEYWORDS.entrySet()) {
+            if (party.contains(e.getKey().toLowerCase()) || method.contains(e.getKey())) return e.getValue();
+        }
+
+        return Optional.ofNullable(trx.getRefId()).orElse("REF_UNCATEGORIZED");
     }
 
-    /**
-     * Hitung total debit, kredit, dan net growth
-     */
+    private Account selectTargetAccountStrict(SavingsRequest request, List<Account> accounts) {
+        if (request != null && request.getAccountNumber() != null && !request.getAccountNumber().isBlank()) {
+            return accounts.stream()
+                    .filter(a -> a.getAccountNumber().equals(request.getAccountNumber()))
+                    .findFirst()
+                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "ACCOUNT_NOT_FOUND",
+                            "Requested account does not belong to the user"));
+        }
+        return accounts.stream()
+                .filter(a -> a.getIsMainAccount() == 1)
+                .findFirst()
+                .orElse(accounts.get(0));
+    }
+
     private Summary calculateSummary(List<TrxHistory> trxList) {
-        BigDecimal totalDebit = sumByType(trxList, "DEBIT");
-        BigDecimal totalCredit = sumByType(trxList, "CREDIT");
-        BigDecimal netGrowth = totalCredit.subtract(totalDebit);
-        return new Summary(totalDebit, totalCredit, netGrowth);
+        BigDecimal debit = sum(trxList, "DEBIT");
+        BigDecimal credit = sum(trxList, "CREDIT");
+        return new Summary(debit, credit, credit.subtract(debit));
     }
 
-    /**
-     * Helper untuk menjumlahkan transaksi berdasarkan tipe
-     */
-    private BigDecimal sumByType(List<TrxHistory> trxList, String type) {
-        return trxList.stream()
+    private BigDecimal sum(List<TrxHistory> list, String type) {
+        return list.stream()
                 .filter(t -> type.equalsIgnoreCase(t.getTransactionType()))
                 .map(TrxHistory::getTransactionAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    /**
-     * Temukan kategori utama dan transaksi masuk terbesar
-     */
     private Insights calculateInsights(List<TrxHistory> trxList) {
-        // Ambil kategori pengeluaran terbesar
-        Map<String, BigDecimal> debitByCategory = trxList.stream()
+        // Top category based on spending (debit)
+        Map<String, BigDecimal> spent = trxList.stream()
                 .filter(t -> "DEBIT".equalsIgnoreCase(t.getTransactionType()))
                 .collect(Collectors.groupingBy(
-                        t -> Optional.ofNullable(t.getPaymentMethod()).orElse("Other"),
+                        t -> t.getRefId(),
                         Collectors.reducing(BigDecimal.ZERO, TrxHistory::getTransactionAmount, BigDecimal::add)
                 ));
 
-        TopCategory topCategory = debitByCategory.entrySet().stream()
+        TopCategory topCategory = spent.entrySet().stream()
                 .max(Map.Entry.comparingByValue())
                 .map(e -> new TopCategory(e.getKey(), e.getValue()))
                 .orElse(null);
 
-        // Ambil transaksi masuk (CREDIT) terbesar
-        Optional<TrxHistory> biggestIncomingTrx = trxList.stream()
+        // Biggest incoming
+        var maxIncoming = trxList.stream()
                 .filter(t -> "CREDIT".equalsIgnoreCase(t.getTransactionType()))
-                .max(Comparator.comparing(TrxHistory::getTransactionAmount));
+                .max(Comparator.comparing(TrxHistory::getTransactionAmount))
+                .map(t -> new BiggestIncoming(
+                        t.getTransactionType(),
+                        t.getTransactionAmount(),
+                        Optional.ofNullable(t.getTransactionDescription()).orElse("Unknown"),
+                        t.getTransactionDate().atZone(ZoneOffset.systemDefault())
+                                .withZoneSameInstant(ZoneOffset.UTC)
+                                .format(ISO_DATETIME_WITH_ZONE) + "Z"
+                ))
+                .orElse(null);
 
-        BiggestIncoming biggestIncoming = biggestIncomingTrx.map(t -> {
-            String formattedDate = t.getTransactionDate() != null
-                    ? t.getTransactionDate().atZone(ZoneOffset.systemDefault())
-                            .withZoneSameInstant(ZoneOffset.UTC)
-                            .format(ISO_DATETIME_WITH_ZONE) + "Z"
-                    : null;
-
-            return new BiggestIncoming(
-                    Optional.ofNullable(t.getTransactionType()).orElse("TRANSFER"),
-                    t.getTransactionAmount(),
-                    Optional.ofNullable(t.getTransactionDescription()).orElse("Unknown"),
-                    formattedDate
-            );
-        }).orElse(null);
-
-        return new Insights(topCategory, biggestIncoming);
+        return new Insights(topCategory, maxIncoming);
     }
 
-    /**
-     * Buat breakdown kategori (pengeluaran per kategori + persen)
-     */
     private List<CategoryBreakdown> calculateCategoryBreakdown(List<TrxHistory> trxList) {
-        Map<String, BigDecimal> debitByCategory = trxList.stream()
+        Map<String, BigDecimal> spent = trxList.stream()
                 .filter(t -> "DEBIT".equalsIgnoreCase(t.getTransactionType()))
                 .collect(Collectors.groupingBy(
-                        t -> Optional.ofNullable(t.getTransactionDescription()).orElse("Other"),
+                        t -> t.getRefId(),
                         Collectors.reducing(BigDecimal.ZERO, TrxHistory::getTransactionAmount, BigDecimal::add)
                 ));
 
-        BigDecimal totalSpent = debitByCategory.values().stream()
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal total = spent.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        return debitByCategory.entrySet().stream()
-                .map(e -> {
-                    int percent = totalSpent.compareTo(BigDecimal.ZERO) > 0
-                            ? e.getValue().multiply(BigDecimal.valueOf(100))
-                                    .divide(totalSpent, 0, RoundingMode.HALF_UP)
-                                    .intValue()
-                            : 0;
-                    return new CategoryBreakdown(e.getKey(), e.getValue(), percent);
-                })
+        return spent.entrySet().stream()
+                .map(e -> new CategoryBreakdown(
+                        e.getKey(),
+                        e.getValue(),
+                        total.compareTo(BigDecimal.ZERO) > 0
+                                ? e.getValue().multiply(BigDecimal.valueOf(100))
+                                .divide(total, 0, RoundingMode.HALF_UP).intValue()
+                                : 0
+                ))
                 .sorted(Comparator.comparing(CategoryBreakdown::getTotal_amount).reversed())
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Buat metadata response (bulan & mata uang)
-     */
     private Meta buildMeta(List<TrxHistory> trxList, Account account) {
-        String month = trxList.isEmpty()
-                ? java.time.LocalDate.now().format(MONTH_FORMATTER)
-                : trxList.get(0).getTransactionDate().format(MONTH_FORMATTER);
-        return new Meta(month, Optional.ofNullable(account.getCurrencyCode()).orElse("IDR"));
+        String month = trxList.get(0).getTransactionDate().format(MONTH_FORMATTER);
+        return new Meta(month, account.getCurrencyCode());
     }
 
-    /**
-     * Jika tidak ada transaksi, kembalikan response default kosong
-     */
     private SavingsResponse buildEmptyResponse(Account selectedAccount) {
-        Meta meta = new Meta(java.time.LocalDate.now().format(MONTH_FORMATTER),
-                Optional.ofNullable(selectedAccount.getCurrencyCode()).orElse("IDR"));
-        Summary summary = new Summary(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
-        return new SavingsResponse(meta, summary, null, null);
+        Meta meta = new Meta(java.time.LocalDate.now().format(MONTH_FORMATTER), selectedAccount.getCurrencyCode());
+        return new SavingsResponse(meta, new Summary(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO), null, null);
     }
 }
