@@ -10,12 +10,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import com.example.wandoor.exception.BusinessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 import com.example.wandoor.config.RequestContext;
+import com.example.wandoor.exception.BusinessException;
 import com.example.wandoor.model.entity.Account;
 import com.example.wandoor.model.entity.TrxHistory;
 import com.example.wandoor.model.enums.ProductType;
@@ -50,51 +49,50 @@ public class SavingsService {
      * Endpoint utama untuk mendapatkan detail tabungan
      */
     public SavingsResponse getSavingsDetail(SavingsRequest request) {
-
         try {
             String userId = RequestContext.get().getUserId();
             String cif = RequestContext.get().getCif();
-
-            // 2️⃣ Validasi user
-            profileRepository.findByIdAndCif(userId, cif)
-                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND" ,  "User not found"));
-
-            // 3️⃣ Ambil semua rekening tabungan (SAV)
+    
+            // ✅ Ambil profile berdasarkan userId
+            var profile = profileRepository.findById(userId)
+                    .orElseThrow(() -> new BusinessException(
+                            HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "User not found"
+                    ));
+    
+            // ✅ Validasi CIF sesuai token
+            if (profile.getCif() == null || !profile.getCif().equalsIgnoreCase(cif)) {
+                throw new BusinessException(HttpStatus.FORBIDDEN, "INVALID_CIF", "CIF does not match user access");
+            }
+    
+            // ✅ Ambil akun tabungan
             List<Account> accounts = accountRepository.findByUserIdAndCifAndAccountType(userId, cif, ProductType.SVG);
             if (accounts.isEmpty()) {
                 throw new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND" ,"No savings account found");
             }
-
-            // 4️⃣ Tentukan rekening target (dari request atau rekening utama)
+    
             Account selectedAccount = selectTargetAccount(request, accounts);
-
-            // 5️⃣ Ambil semua transaksi dari rekening tersebut
+    
             List<TrxHistory> trxList = trxHistoryRepository.findByAccountNumber(selectedAccount.getAccountNumber());
             if (trxList.isEmpty()) {
                 return buildEmptyResponse(selectedAccount);
             }
-
-            // 6️⃣ Hitung total debit, kredit, dan pertumbuhan bersih
+    
             Summary summary = calculateSummary(trxList);
-
-            // 7️⃣ Temukan kategori pengeluaran dan transaksi masuk terbesar
             Insights insights = calculateInsights(trxList);
-
-            // 8️⃣ Hitung breakdown kategori (persentase pengeluaran per kategori)
             List<CategoryBreakdown> breakdown = calculateCategoryBreakdown(trxList);
-
-            // 9️⃣ Ambil meta (bulan transaksi + mata uang)
             Meta meta = buildMeta(trxList, selectedAccount);
-
-            // 🚀 10️⃣ Kembalikan response lengkap
+    
             return new SavingsResponse(meta, summary, insights, breakdown.isEmpty() ? null : breakdown);
+    
         } catch (BusinessException e) {
             throw e;
-        }  catch (Exception e) {
-            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UNEXPECTED_ERROR", "Something went wrong while retrieving savings detail data", e);
+        } catch (Exception e) {
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UNEXPECTED_ERROR",
+                "Something went wrong while retrieving savings detail data", e);
         }
-
     }
+    
+    
 
     /**
      * Pilih rekening target berdasarkan input user atau akun utama
