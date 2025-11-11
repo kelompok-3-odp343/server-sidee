@@ -13,7 +13,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
-public class DetailUserAdminController {
+public class AdminController {
 
     private final DetailUserAdminService detailUserAdminService;
     private final AdminMenuAccessService adminMenuAccessService;
