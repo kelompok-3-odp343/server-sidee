@@ -23,7 +23,7 @@ import java.net.URI;
 import java.util.Map;
 
 @RestController
-@RequestMapping("api/split-bill")
+@RequestMapping("api/v1/split-bill")
 @RequiredArgsConstructor
 @Log4j2
 public class SplitBillController {

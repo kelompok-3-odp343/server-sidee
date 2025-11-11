@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 
 import java.util.Date;
+import java.util.Map;
 
 @Component
 @Log4j2
@@ -19,25 +20,22 @@ public class JwtUtils {
     @Value("${app.jwt.expiration-ms:3600000}")
     private long jwtExperiatonMs;
 
-    public String generateToken(String userId, String role){
+    public String generateToken(Map<String, Object> claims, String userId) {
         var algorithm = Algorithm.HMAC256(jwtSecret.getBytes(StandardCharsets.UTF_8));
-        return JWT.create()
-                .withSubject(userId)
-                .withClaim("role", role)
-                .withIssuedAt(new Date())
-                .withExpiresAt(new Date(System.currentTimeMillis() + jwtExperiatonMs))
-                .sign(algorithm);
+        var builder = JWT.create().withClaim("userId", userId);
+        claims.forEach((k, v) -> builder.withClaim(k, v.toString()));
+        builder.withIssuedAt(new Date())
+                .withExpiresAt(new Date(System.currentTimeMillis() + jwtExperiatonMs));
+        return builder.sign(algorithm);
     }
 
     public DecodedJWT validateToken(String token){
-        log.info("🔐 Validating JWT using secret: {}", jwtSecret);
-
         try {
         var algorithm =  Algorithm.HMAC256(jwtSecret.getBytes(StandardCharsets.UTF_8));
         var jwtVerifier = JWT.require(algorithm).build();
+        var decoded = jwtVerifier.verify(token);
         log.info("✅ Token valid untuk subject={} role={}", jwtVerifier.verify(token).getSubject(), jwtVerifier.verify(token).getClaim("role").asString());
-        return jwtVerifier.verify(token);
-
+        return decoded;
         } catch (Exception e) {
             log.error("❌ JWT invalid: {} | Secret used: {}", e.getMessage(), jwtSecret);
             throw e;

@@ -3,6 +3,7 @@ package com.example.wandoor.service;
 import java.math.BigDecimal;
 import java.util.List;
 
+import com.example.wandoor.exception.BusinessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,64 +45,71 @@ public class DashboardService {
     @Transactional
     public FetchDashboardResponse fetchDashboard() {
         var userId = RequestContext.get().getUserId();
-        var cif = RequestContext.get().getCif(); // tetap digunakan untuk repositori lain
+        var cif = RequestContext.get().getCif();
 
-        // 🔹 Verifikasi user
-        profileRepository.findByIdAndCif(userId, cif)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        try {
+            // 🔹 Verifikasi user
+            profileRepository.findByIdAndCif(userId, cif)
+                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "User not found"));
 
-        // 🔹 Ambil data rekening & investasi
-        var timeDeposit = timeDepositRepository.findByUserIdAndCif(userId, cif);
-        var account = accountRepository.findByUserIdAndCif(userId, cif);
-        var lifegoals = lifegoalsAccountRepository.findByUserIdAndCif(userId, cif);
-        var dplk = dplkAccountRepository.findAllByUserIdAndCif(userId, cif);
+            // 🔹 Ambil data rekening & investasi
+            var timeDeposit = timeDepositRepository.findByUserIdAndCif(userId, cif);
+            var account = accountRepository.findByUserIdAndCif(userId, cif);
+            var lifegoals = lifegoalsAccountRepository.findByUserIdAndCif(userId, cif);
+            var dplk = dplkAccountRepository.findAllByUserIdAndCif(userId, cif);
 
-        var statuses = List.of(AccountStatus.BUKA, AccountStatus.BARU);
-        List<Account> accounts = accountRepository.fetchActiveAccounts(userId, cif, statuses);
+            var statuses = List.of(AccountStatus.BUKA, AccountStatus.BARU);
+            List<Account> accounts = accountRepository.fetchActiveAccounts(userId, cif, statuses);
 
-        var totalTimeDeposit = sum(timeDeposit, TimeDepositAccount::getEffectiveBalance);
-        var totalAccount = sum(account, Account::getEffectiveBalance);
-        var totalLifegoals = sum(lifegoals, LifegoalsAccount::getEstimationAmount);
-        // var totalDplk = sum(dplk, DplkAccount::getBalance);
+            var totalTimeDeposit = sum(timeDeposit, TimeDepositAccount::getEffectiveBalance);
+            var totalAccount = sum(account, Account::getEffectiveBalance);
+            var totalLifegoals = sum(lifegoals, LifegoalsAccount::getEstimationAmount);
+            // var totalDplk = sum(dplk, DplkAccount::getBalance);
 
-        var totalAsset = totalAccount.add(totalTimeDeposit).add(totalLifegoals); // bisa ditambah dplk jika siap
+            var totalAsset = totalAccount.add(totalTimeDeposit).add(totalLifegoals); // bisa ditambah dplk jika siap
 
-        // 🔹 Split bill overview
-        var countSplitBills = splitBillRepository.countActiveByCreator(userId, cif);
-        var totalBillAmount = nvl(splitBillRepository.sumTotalBillByCreator(userId, cif));
-        var remainingBillAmount = nvl(splitBillMemberRepository.sumRemainingForCreator(userId, cif));
+            // 🔹 Split bill overview
+            var countSplitBills = splitBillRepository.countActiveByCreator(userId, cif);
+            var totalBillAmount = nvl(splitBillRepository.sumTotalBillByCreator(userId, cif));
+            var remainingBillAmount = nvl(splitBillMemberRepository.sumRemainingForCreator(userId, cif));
 
-        // 🔹 Cash flow overview — TANPA CIF (karena field-nya tidak ada di TrxHistory)
-        var totalIncome = nvl(trxHistoryRepository.sumTransactionAmountByUserIdAndDebitCredit(userId, DebitCredit.D));
-        var totalExpenses = nvl(trxHistoryRepository.sumTransactionAmountByUserIdAndDebitCredit(userId, DebitCredit.C));
+            // 🔹 Cash flow overview — TANPA CIF (karena field-nya tidak ada di TrxHistory)
+            var totalIncome = nvl(trxHistoryRepository.sumTransactionAmountByUserIdAndDebitCredit(userId, DebitCredit.D));
+            var totalExpenses = nvl(trxHistoryRepository.sumTransactionAmountByUserIdAndDebitCredit(userId, DebitCredit.C));
 
-        // 🔹 Portfolio Overview
-        var portfolioOverview = List.of(
-                new FetchDashboardResponse.PortfolioOverview("timeDeposit", totalTimeDeposit),
-                new FetchDashboardResponse.PortfolioOverview("lifegoals", totalLifegoals),
-                new FetchDashboardResponse.PortfolioOverview("accountSavings", totalAccount)
-        );
+            // 🔹 Portfolio Overview
+            var portfolioOverview = List.of(
+                    new FetchDashboardResponse.PortfolioOverview("timeDeposit", totalTimeDeposit),
+                    new FetchDashboardResponse.PortfolioOverview("lifegoals", totalLifegoals),
+                    new FetchDashboardResponse.PortfolioOverview("accountSavings", totalAccount)
+            );
 
-        // 🔹 Account list overview
-        var accountList = accounts.stream()
-                .map(a -> new FetchDashboardResponse.Accountlist(
-                        a.getAccountNumber(),
-                        a.getAccountHolderName(),
-                        a.getEffectiveBalance(),
-                        a.getSubCat(),
-                        a.getAccountStatus(),
-                        a.getCreatedTime()
-                ))
-                .toList();
+            // 🔹 Account list overview
+            var accountList = accounts.stream()
+                    .map(a -> new FetchDashboardResponse.Accountlist(
+                            a.getAccountNumber(),
+                            a.getAccountHolderName(),
+                            a.getEffectiveBalance(),
+                            a.getSubCat(),
+                            a.getAccountStatus(),
+                            a.getCreatedTime()
+                    ))
+                    .toList();
 
-        // 🔹 Response akhir
-        return new FetchDashboardResponse(
-                new FetchDashboardResponse.AssetOverview(totalAsset),
-                new FetchDashboardResponse.CashFlowOverview(totalIncome, totalExpenses, remainingBillAmount),
-                portfolioOverview,
-                new FetchDashboardResponse.SplitBillOverview((int) countSplitBills, totalBillAmount, remainingBillAmount),
-                accountList
-        );
+            // 🔹 Response akhir
+            return new FetchDashboardResponse(
+                    new FetchDashboardResponse.AssetOverview(totalAsset),
+                    new FetchDashboardResponse.CashFlowOverview(totalIncome, totalExpenses, remainingBillAmount),
+                    portfolioOverview,
+                    new FetchDashboardResponse.SplitBillOverview((int) countSplitBills, totalBillAmount, remainingBillAmount),
+                    accountList
+            );
+        } catch (BusinessException e) {
+            throw e;
+        }  catch (Exception e) {
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UNEXPECTED_ERROR", "Something went wrong while retrieving dashboard data", e);
+        }
+
     }
 
     private static <T> BigDecimal sum(List<T> list, java.util.function.Function<T, BigDecimal> getter) {

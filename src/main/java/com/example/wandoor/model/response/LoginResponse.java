@@ -7,6 +7,6 @@ import io.soabase.recordbuilder.core.RecordBuilder;
 public record LoginResponse(
         boolean status,
         String message,
-        String sessionId
+        String sessionIdOrToken
 ) {
 }

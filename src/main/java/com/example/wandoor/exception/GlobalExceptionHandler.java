@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -67,9 +68,7 @@ public class GlobalExceptionHandler {
             body.put("message", ex.getReason());
             body.put("timestamp", Instant.now().toString());
             body.put("traceId", MDC.get("traceId"));
-            body.put("requestId", MDC.get("requestId"));
-            body.put("traceId", MDC.get("traceId"));
-            body.put("requestId", MDC.get("requestId"));
+            body.put("requestId", MDC.get("requestId"));;
             
             return ResponseEntity.status(ex.getStatusCode()).body(body);
         }
@@ -88,4 +87,19 @@ public class GlobalExceptionHandler {
             
                     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
                 }
+
+        @ExceptionHandler(AuthorizationDeniedException.class)
+        public ResponseEntity<Map<String, Object>> handleAuthorizationDeniedException(AuthorizationDeniedException ex) {
+            log.warn("Access denied: {}", ex.getMessage());
+
+            Map<String, Object> body = new HashMap<>();
+            body.put("status", HttpStatus.FORBIDDEN.value());
+            body.put("errorCode", "ACCESS_DENIED");
+            body.put("message", "Akses ditolak. Anda tidak memiliki izin untuk endpoint ini.");
+            body.put("timestamp", Instant.now().toString());
+            body.put("traceId", MDC.get("traceId"));
+            body.put("requestId", MDC.get("requestId"));
+
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+        }
 }

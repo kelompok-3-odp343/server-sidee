@@ -12,7 +12,7 @@ public class BusinessException extends RuntimeException {
     private final HttpStatus status;
     private final String errorCode;
 
-    public BusinessException(HttpStatus status, String message) {
+    public BusinessException(HttpStatus status, String message ) {
         super(message);
         this.status = status;
         this.errorCode = status.name();
@@ -22,5 +22,13 @@ public class BusinessException extends RuntimeException {
         super(message);
         this.status = status;
         this.errorCode = errorCode;
-    }  
+    }
+
+    public BusinessException(HttpStatus status, String errorCode, String message, Throwable cause){
+        super(message, cause);
+        this.status = status;
+        this.errorCode = errorCode;
+    }
+
+
 }
