@@ -17,7 +17,7 @@ public class ProfileController{
         this.service = service;
     }
 
-    @GetMapping("profile")
+    @GetMapping("/profile")
     public ResponseEntity<ProfileResponse> getProfile(){
        var response = service.getProfile();
                return ResponseEntity.ok(response);

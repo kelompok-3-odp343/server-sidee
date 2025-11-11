@@ -37,7 +37,6 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter{
                 String traceId = MDC.get("traceId") != null ? MDC.get("traceId") : UUID.randomUUID().toString();
                 String requestId = UUID.randomUUID().toString();
 
-
                 // isi MDC
                 MDC.put("traceId", traceId);
                 MDC.put("requestId", requestId);
@@ -67,8 +66,8 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter{
                         requestBody = request.getQueryString() != null ? request.getQueryString() : "";
                     };
 
-                    String responseBody = "";
                     byte[] resBody = responseWrapper.getContentAsByteArray();
+                    String responseBody = new String(resBody, StandardCharsets.UTF_8);
                     if (resBody.length > 2000 ){
                         responseBody = responseBody.substring(0, 2000) + "...(truncated)";
                     }
