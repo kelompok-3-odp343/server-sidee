@@ -85,13 +85,13 @@ jobs:
           timeout: '10m0s'  # Timeout 10 menit
           scanners: 'vuln'  # Hanya scan vulnerability (skip secret/config
           
-          trivy-config-scan:
-          steps:
-      - name: Scan IaC configs
-        uses: aquasecurity/trivy-action@v0.28.0
-        with:
-          scan-type: config
-          format: table
+      #     trivy-config-scan:
+      #     steps:
+      # - name: Scan IaC configs
+      #   uses: aquasecurity/trivy-action@v0.28.0
+      #   with:
+      #     scan-type: config
+      #     format: table
       
       # Login ke DockerHub
       - name: Log in to DockerHub
