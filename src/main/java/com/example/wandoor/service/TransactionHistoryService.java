@@ -35,6 +35,7 @@ public class TransactionHistoryService {
     public TransactionHistoryResponse fetchTransactionHistory(TransactionHistoryRequest request){
         var userId = RequestContext.get().getUserId();
         var cif = RequestContext.get().getCif();
+//        log.info("DEBUG: Incoming request = {}", request);
 
         try {
             var userExists = profileRepository.findByIdAndCif(userId, cif)
