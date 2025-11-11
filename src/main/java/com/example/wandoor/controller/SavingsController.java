@@ -13,13 +13,13 @@ import com.example.wandoor.service.SavingsService;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("api/savings")
+@RequestMapping("api/v1")
 @RequiredArgsConstructor
 public class SavingsController {
 
     private final SavingsService savingsService;
 
-    @PostMapping("/detail")
+    @PostMapping("/savings/detail")
 public ResponseEntity<SavingsResponse> getSavingsDetail(@RequestBody(required = false) SavingsRequest request) {
     var response = savingsService.getSavingsDetail(request);
     return ResponseEntity.ok(response);
