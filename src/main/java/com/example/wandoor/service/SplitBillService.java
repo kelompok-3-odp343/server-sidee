@@ -358,10 +358,16 @@ public class SplitBillService {
                                 return new BusinessException(HttpStatus.CONFLICT, "INVALID_USER", "User Not Found");    
                         });
 
-                splitBillRepository.findUnpaidMember(request.splitBillId(), request.memberId())
+                splitBillRepository.findByUserIdAndCifAndId(userId, cif, request.splitBillId())
                         .orElseThrow(() -> {
                                 log.warn("Split Bill not found for splitBillId={} and memberId={}", request.splitBillId(), request.memberId());
                                 return new BusinessException(HttpStatus.CONFLICT, "INVALID_SPLIT_BILL", "No Such Split Bill or Member");
+                        });
+
+                splitBillMemberRepository.findUnpaidSplitBillMemberById(request.splitBillId(), request.memberId())
+                        .orElseThrow(() -> {
+                            log.warn("Unpaid split bill member for memberId={} not found", request.memberId());
+                            return new BusinessException(HttpStatus.CONFLICT, "UNPAID_MEMBER_NOT_FOUND", "Unpaid split bill member not found");
                         });
 
                 int updated = splitBillMemberRepository.markAsPaid(request.splitBillId(), request.memberId());
@@ -371,7 +377,6 @@ public class SplitBillService {
                         throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UPDATE_FAILED", "Failed to mark as paid");
                         }        
                 } catch (ResponseStatusException e) {
-                        log.warn("Business error while fetching split bills: {}", e.getMessage());
                         throw e;
                         
                 } catch (Exception e) {

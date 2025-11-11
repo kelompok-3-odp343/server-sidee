@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
 public interface SplitBillMemberRepository extends JpaRepository<SplitBillMember, String> {
     // Remaining = jumlah porsi yang belum lunas pada SEMUA bill milik si creator
@@ -32,8 +33,17 @@ public interface SplitBillMemberRepository extends JpaRepository<SplitBillMember
         UPDATE SplitBillMember sbm
         SET hasPaid = 1,
         updatedTime = CURRENT_TIMESTAMP
-        WHERE sbm.id =: memberId
-        AND sbm.splitBillId =: splitBillId        
+        WHERE sbm.splitBill.id =: splitBillId
+        AND sbm.id =: memberId
     """)
     int markAsPaid (@Param("splitBillId") String splitBillId, @Param("memberId") String memberId);
+
+    @Query("""
+            SELECT sbm
+            FROM SplitBillMember sbm
+            WHERE sbm.splitBill.id =: splitBillId
+            AND sbm.id =: memberId
+            AND hasPaid = 0
+            """)
+    Optional<SplitBillMember> findUnpaidSplitBillMemberById (@Param("splitBillId") String splitBillId, @Param("memberId") String memberId);
 }
