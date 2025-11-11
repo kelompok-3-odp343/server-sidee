@@ -1,5 +1,6 @@
 package com.example.wandoor.repository;
 
+import com.example.wandoor.model.entity.Account;
 import com.example.wandoor.model.entity.UserAuth;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -9,7 +10,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface DetailUserAdminRepository extends JpaRepository<UserAuth, String> {
+public interface DetailUserAdminRepository extends JpaRepository<Account, String> {
 
     @Query(value = """
         SELECT 

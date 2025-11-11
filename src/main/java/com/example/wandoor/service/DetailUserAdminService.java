@@ -1,5 +1,6 @@
 package com.example.wandoor.service;
 
+import com.example.wandoor.exception.BusinessException;
 import com.example.wandoor.model.request.DetailUserAdminRequest;
 import com.example.wandoor.model.response.DetailUserAdminResponse;
 import com.example.wandoor.repository.DetailUserAdminRepository;
@@ -7,6 +8,7 @@ import com.example.wandoor.repository.RoleManagementRepository;
 import com.example.wandoor.repository.UserAuthRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -25,31 +27,24 @@ public class DetailUserAdminService {
     public DetailUserAdminResponse getUserDetail(DetailUserAdminRequest request) {
 
         // ✅ Ambil user admin dari JWT (bukan dari header / RequestContext)
-        String adminUserId = SecurityContextHolder.getContext().getAuthentication().getName();
-        if (adminUserId == null || adminUserId.isBlank()) {
-            throw new RuntimeException("User admin tidak ditemukan dari token JWT");
-        }
-
-        var admin = userAuthRepository.findById(adminUserId)
-                .orElseThrow(() -> new RuntimeException("User admin tidak ditemukan"));
-
-        var role = roleManagementRepository.findById(admin.getRoleId())
-                .orElseThrow(() -> new RuntimeException("Role admin tidak ditemukan"));
-
-        if (!"ADMIN".equalsIgnoreCase(role.getRoleName())) {
-            throw new RuntimeException("Anda bukan admin — akses ditolak");
-        }
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        var adminUserId = authentication.getName();
+        var role = authentication.getAuthorities().stream()
+                .findFirst()
+                .map(Object::toString)
+                .orElse("UNKNOWN");
+        log.info("👤 Admin {} (role={}) mengakses data user {}", adminUserId, role, request.getTargetUserId());
 
         // ✅ Ambil userId nasabah dari body request
         String targetUserId = request.getTargetUserId();
         if (targetUserId == null || targetUserId.isBlank()) {
-            throw new RuntimeException("User ID nasabah wajib diisi di body request");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "UserId nasabah wajib diisi1");
         }
 
         // ✅ Eksekusi query detail nasabah
         List<Object[]> results = detailUserAdminRepository.findNasabahDetailByUserId(targetUserId);
         if (results.isEmpty()) {
-            throw new RuntimeException("Data user tidak ditemukan atau bukan nasabah");
+            throw new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "Data nasabah tidak ditemukan!");
         }
 
         return buildResponse(results);
