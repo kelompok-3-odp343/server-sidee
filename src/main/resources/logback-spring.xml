@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration scan="true">
 
-    <!-- Console Appender -->
+    <!-- Tentukan lokasi log -->
+    <property name="LOG_PATH" value="/var/log/springboot" />
+    <property name="LOG_FILE" value="${LOG_PATH}/app.log" />
+
+    <!-- Console Appender (JSON format) -->
     <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
             <providers>
@@ -16,7 +20,6 @@
                         "logger": "%logger{36}",
                         "message": "%message",
                         "thread": "%thread",
-<!--                        "context": "%mdc",-->
                         "stack_trace": "%ex{full}"
                         }
                     </pattern>
@@ -25,11 +28,11 @@
         </encoder>
     </appender>
 
-    <!-- File Appender (JSON juga) -->
+    <!-- File Appender (JSON format) -->
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>logs/app.log</file>
+        <file>${LOG_FILE}</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>logs/app-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <fileNamePattern>${LOG_PATH}/app-%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>7</maxHistory>
         </rollingPolicy>
         <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
@@ -45,7 +48,6 @@
                         "logger": "%logger{36}",
                         "message": "%message",
                         "thread": "%thread",
-<!--                        "context": "%mdc",-->
                         "stack_trace": "%ex{full}"
                         }
                     </pattern>
@@ -54,7 +56,7 @@
         </encoder>
     </appender>
 
-    <!-- Root log level -->
+    <!-- Root Logger -->
     <root level="INFO">
         <appender-ref ref="JSON_CONSOLE"/>
         <appender-ref ref="FILE"/>
