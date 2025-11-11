@@ -1,8 +1,13 @@
 package com.example.wandoor.security;
 
-import java.io.IOException;
-import java.util.List;
-
+import com.example.wandoor.config.RequestContext;
+import com.example.wandoor.util.JwtUtils;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 import org.slf4j.MDC;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
@@ -12,15 +17,8 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import com.example.wandoor.config.RequestContext;
-import com.example.wandoor.util.JwtUtils;
-
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.log4j.Log4j2;
+import java.io.IOException;
+import java.util.List;
 
 @Log4j2
 @Component
@@ -33,78 +31,83 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest req,
-                                    HttpServletResponse res,
-                                    FilterChain chain)
+                                    HttpServletResponse response,
+                                    FilterChain filterChain)
             throws ServletException, IOException {
 
         String path = req.getRequestURI();
 
-        // Skip auth endpoints
+        // Lewati JWT Filter untuk endpoint auth
         if (path.startsWith("/api/auth/")) {
-            chain.doFilter(req, res);
+            filterChain.doFilter(req, response);
             return;
         }
 
-        String authHeader = req.getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            unauthorized(res, "Unauthorized: Missing or invalid Authorization header");
+        var header = req.getHeader("Authorization");
+        if (header == null || !header.startsWith("Bearer ")){
+            unauthorized(response, "Unauthorized - Token JWT tidak valid");
             return;
         }
 
-        String token = authHeader.substring(7);
+//        if (userIdHeader == null || cifHeader == null) {
+//            unauthorized(response, "Unauthorized - Missing userId or cif header");
+//            return;
+//        }
+
+        var token = header.substring(7);
 
         try {
-            // Check Redis blacklist (logout)
-            String blacklistKey = "jwt_blacklist:" + token;
+            // Check token blacklist
+            var blacklistKey = "jwt_blacklist:" + token;
             if (stringRedisTemplate.hasKey(blacklistKey)) {
-                unauthorized(res, "Unauthorized: Token has been logged out");
+                unauthorized(response, "Unauthorized - Token sudah logout");
                 return;
             }
 
             // Validate JWT
             var jwt = jwtUtils.validateToken(token);
-            String userId = jwt.getSubject();
-            String role = jwt.getClaim("role").asString();
+            var userId = jwt.getClaim("userId").asString();
+            var role = jwt.getClaim("role").asString();
+            var cif = jwt.getClaim("cif").asString();
+            //TODO Add NPP for Admin
 
-            // Nasabah MUST send Customer-Id header
-            String cifHeader = req.getHeader("Customer-Id");
-            if (!"ADMIN".equalsIgnoreCase(role) && cifHeader == null) {
-                unauthorized(res, "Unauthorized: Missing Customer-Id for NASABAH");
-                return;
+            if (!"NASABAH".equalsIgnoreCase(role)) cif = null;
+
+            MDC.put("userId", userId);
+            if (cif != null) MDC.put("cif", cif);
+
+            if (SecurityContextHolder.getContext().getAuthentication() == null){
+                var auth = new UsernamePasswordAuthenticationToken(userId, null, List.of(() -> "ROLE_" + role));
+                auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(req));
+                SecurityContextHolder.getContext().setAuthentication(auth);
             }
 
-            // Put into Spring Security Context
-            var authToken = new UsernamePasswordAuthenticationToken(
-                    userId, null, List.of(() -> "ROLE_" + role)
-            );
-            authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(req));
-            SecurityContextHolder.getContext().setAuthentication(authToken);
-
-            // Store in RequestContext (to be used in services)
+            // ✅ Set RequestContext (SUPAYA SERVICE DAPAT ADMIN USER ID)
             RequestContext ctx = RequestContext.get();
             ctx.setUserId(userId);
-            ctx.setCif(cifHeader); // null allowed for admin
+            ctx.setCif(cif);
 
-            // Logging context
-            MDC.put("userId", userId);
-            MDC.put("cif", cifHeader);
+            log.info("🔐 Authenticated user={} role={} cif={}", userId, role, cif != null ? cif : "-");
 
-            chain.doFilter(req, res);
+            filterChain.doFilter(req, response);
 
         } catch (Exception e) {
-            log.error("❌ JWT Filtering Error: {}", e.getMessage(), e);
+            log.error("❌ Error di JwtAuthenticationFilter: {}", e.getMessage(), e);
             SecurityContextHolder.clearContext();
-            unauthorized(res, "Unauthorized: Invalid JWT token");
+            unauthorized(response, "Unauthorized - Token JWT tidak valid");
+        } finally {
+            MDC.remove("userId");
+            MDC.remove("cif");
         }
     }
 
-
-    private void unauthorized(HttpServletResponse res, String message) throws IOException {
+    private void unauthorized(HttpServletResponse res, String msg) throws IOException {
         if (res.isCommitted()) return;
         res.resetBuffer();
         res.setStatus(HttpStatus.UNAUTHORIZED.value());
+        res.setCharacterEncoding("UTF-8");
         res.setContentType("application/json");
-        res.getWriter().write("{\"status\":false,\"message\":\"" + message + "\"}");
+        res.getWriter().write("{\"status\":false,\"message\":\"" + msg + "\"}");
         res.flushBuffer();
     }
 }

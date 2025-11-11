@@ -1,10 +1,14 @@
 package com.example.wandoor.service;
 
-import com.example.wandoor.repository.UserListAdminRepository;
-import lombok.RequiredArgsConstructor;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import com.example.wandoor.repository.UserListAdminRepository;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -14,14 +18,7 @@ public class UserListAdminService {
 
     public Map<String, Object> getAllUsersList(String userIdHeader) {
 
-        String userRole = repository.findRoleByUserId(userIdHeader);
-        if (!"ADMIN".equalsIgnoreCase(userRole)) {
-            return Map.of(
-                "status", false,
-                "message", "Forbidden - Anda bukan admin"
-            );
-        }
-    
+
         // ✅ Ambil summary
         Object[] summary = repository.getUserSummary().get(0);
     
