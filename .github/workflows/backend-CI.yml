@@ -65,17 +65,43 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           push: false
+          load: true
           tags: jrtr1/wandoor-backend-app:temp-scan
 
-      # === TRIVY SCAN ===
-      # - name: Run Trivy vulnerability scanner
-      #   uses: aquasecurity/trivy-action@master
-      #   with:
-      #     image-ref: "jrtr1/wandoor-backend-app:temp-scan"
-      #     format: "table"
-      #     exit-code: "0"
-      #     vuln-type: "os,library"
-      #     severity: "CRITICAL,HIGH"
+      # Verifikasi image sudah ada
+      - name: Verify Docker image exists
+        run: docker images | grep jrtr1/wandoor-backend-app
+      
+      # 1. Scan Docker image (PRIORITAS UTAMA)
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.28.0  # Pin ke versi stabil
+        with:
+          image-ref: 'jrtr1/wandoor-backend-app:backend-latest'
+          format: 'table'
+          exit-code: '0'  # Staging: '0' (warning only) | Production: '1' (block deploy)
+          ignore-unfixed: true  # Skip vuln yang belum ada patch
+          vuln-type: 'os,library'  # Scan OS packages & library dependencies
+          severity: 'CRITICAL,HIGH'  # Fokus ke yang paling berbahaya
+          timeout: '10m0s'  # Timeout 10 menit
+          scanners: 'vuln'  # Hanya scan vulnerability (skip secret/config)
+      
+      # 2. Upload ke GitHub Security (untuk tracking jangka panjang)
+      - name: Upload Trivy results to GitHub Security
+        uses: aquasecurity/trivy-action@0.28.0
+        if: always()
+        with:
+          image-ref: 'jrtr1/wandoor-backend-app:backend-latest'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'  # Include MEDIUM untuk visibility
+          scanners: 'vuln'
+      
+      - name: Upload SARIF to GitHub
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
 
       # Login ke DockerHub
       - name: Log in to DockerHub
