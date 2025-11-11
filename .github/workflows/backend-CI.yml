@@ -85,24 +85,6 @@ jobs:
           timeout: '10m0s'  # Timeout 10 menit
           scanners: 'vuln'  # Hanya scan vulnerability (skip secret/config)
       
-      # 2. Upload ke GitHub Security (untuk tracking jangka panjang)
-      - name: Upload Trivy results to GitHub Security
-        uses: aquasecurity/trivy-action@0.28.0
-        if: always()
-        with:
-          image-ref: 'jrtr1/wandoor-backend-app:backend-latest'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH,MEDIUM'  # Include MEDIUM untuk visibility
-          scanners: 'vuln'
-      
-      - name: Upload SARIF to GitHub
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: 'trivy-results.sarif'
-
-
       # Login ke DockerHub
       - name: Log in to DockerHub
         uses: docker/login-action@v2
