@@ -96,10 +96,10 @@ jobs:
         # 2. Jalankan container sementara untuk load test
       - name: Run backend container for testing
         run: |
-          docker run -d --name backend-test -p 8080:8080 jrtr1/wandoor-backend-app:temp-scan
+          docker run -d --name backend-test -p 8000:8000 jrtr1/wandoor-backend-app:temp-scan
           echo "Waiting for backend to be ready..."
           sleep 20  # tunggu app siap (bisa disesuaikan)
-          
+
       # K6 Load Test
       - name: Install k6
         run: |
