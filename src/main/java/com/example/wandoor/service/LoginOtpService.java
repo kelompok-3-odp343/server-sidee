@@ -148,7 +148,6 @@ public class LoginOtpService {
                             false,
                             "Terlalu banyak percobaan OTP. Akun diblokir sementara.",
                             null,
-                            null,
                             attemptCount.intValue()
                     );
                 }
@@ -156,7 +155,6 @@ public class LoginOtpService {
                 return new VerifyOtpResponse(
                         false,
                         "OTP salah. Percobaan ke-" + attemptCount + " dari " + MAX_OTP_FAIL + ".",
-                        null,
                         null,
                         attemptCount.intValue()
                 );
@@ -182,14 +180,7 @@ public class LoginOtpService {
             var sessionKey = "session:" + req.sessionId();
             stringRedisTemplate.opsForValue().set(sessionKey, token, TOKEN_TTL);
 
-            var dataUser = new VerifyOtpResponse.User(
-                    userData.getUserId(),
-                    profile.getCif(),
-                    userData.getUsername(),
-                    role
-            );
-
-            return new VerifyOtpResponse(true, "login berhasil", token, dataUser, attemptCount.intValue());
+            return new VerifyOtpResponse(true, "login berhasil", token, attemptCount.intValue());
 
         } catch (BusinessException e) {
             throw e;
