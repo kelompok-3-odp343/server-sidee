@@ -6,8 +6,6 @@ import jakarta.persistence.Id;
 import lombok.*;
 import org.hibernate.annotations.UuidGenerator;
 
-import java.sql.Clob;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -16,7 +14,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @ToString(onlyExplicitlyIncluded = true)
-public class AdminMenuAccess {
+public class MsMenu {
     @Id
     @UuidGenerator
     @Column(nullable = false)
