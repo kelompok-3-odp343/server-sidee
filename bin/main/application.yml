@@ -41,7 +41,12 @@ spring:
       port: ${REDIS_PORT:6379}
 
 logging:
+  file:    # Tambahan untuk Loki
+    path: /var/log/springboot    #Tambahan untuk Loki
   level:
+    root: INFO    #Tambahan untuk Loki
+    org.springframework.web: INFO    #Tambahan untuk Loki
+    com.wandoor: DEBUG    #Tambahan untuk Loki
     org.springframework.security: DEBUG
     org.springframework.data.redis: INFO
 
