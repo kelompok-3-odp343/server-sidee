@@ -3,68 +3,57 @@ package com.example.wandoor.model.response;
 import java.math.BigDecimal;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@AllArgsConstructor
+@Builder
 @NoArgsConstructor
+@AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class SavingsResponse {
-    private Meta meta;
-    private Summary summary;
-    private Insights insights;
-    private List<CategoryBreakdown> category_breakdown;
+
+    @JsonProperty("targetAccountDetail")
+    private TargetAccountDetail targetAccountDetail;
+
+    @JsonProperty("accountList")
+    private List<AccountListItem> accountList;
 
     @Data
-    @AllArgsConstructor
+    @Builder
     @NoArgsConstructor
-    public static class Meta {
-        private String month;    // e.g. "2025-05"
-        private String currency; // e.g. "IDR"
+    @AllArgsConstructor
+    public static class TargetAccountDetail {
+        @JsonProperty("Total_EffectiveBalance")
+        private BigDecimal totalEffectiveBalance;
     }
 
     @Data
-    @AllArgsConstructor
+    @Builder
     @NoArgsConstructor
-    public static class Summary {
-        private BigDecimal total_debit;
-        private BigDecimal total_credit;
-        private BigDecimal net_growth;
-    }
+    @AllArgsConstructor
+    public static class AccountListItem {
+        @JsonProperty("account_number")
+        private String accountNumber;
 
-    @Data
-    @AllArgsConstructor
-    @NoArgsConstructor
-    public static class Insights {
-        private TopCategory top_category;
-        private BiggestIncoming biggest_incoming;
-    }
+        @JsonProperty("account_name")
+        private String accountName;
 
-    @Data
-    @AllArgsConstructor
-    @NoArgsConstructor
-    public static class TopCategory {
-        private String name;
-        private BigDecimal spent_amount;
-    }
+        @JsonProperty("product_name")
+        private String productName;
 
-    @Data
-    @AllArgsConstructor
-    @NoArgsConstructor
-    public static class BiggestIncoming {
-        private String type;
-        private BigDecimal amount;
-        private String source;    // e.g. "Taplus Bisnis"
-        private String date;      // ISO string e.g. "2025-05-31T09:20:11Z"
-    }
+        @JsonProperty("effective_balance_total")
+        private BigDecimal effectiveBalanceTotal;
 
-    @Data
-    @AllArgsConstructor
-    @NoArgsConstructor
-    public static class CategoryBreakdown {
-        private String category;
-        private BigDecimal total_amount;
-        private Integer percent;
+        @JsonProperty("is_main_account")
+        private Boolean isMainAccount;
+
+        @JsonProperty("account_status")
+        private String accountStatus;
     }
 }
