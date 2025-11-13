@@ -66,7 +66,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             var cif = jwt.getClaim("cif").asString();
             //TODO Add NPP for Admin
 
-            if (!"NASABAH".equalsIgnoreCase(role)) cif = null;
+            if ("NASABAH".equalsIgnoreCase((role)))
+
+            if (!"NASABAH".equalsIgnoreCase(role)) {
+                cif = null;
+            }
 
             MDC.put("userId", userId);
             if (cif != null) MDC.put("cif", cif);

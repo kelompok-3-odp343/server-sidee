@@ -90,6 +90,7 @@ public class LoginOtpService {
                     .map(RoleManagement::getRoleName)
                     .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "ROLE_NOT_FOUND", "role not found"));
 
+
             var roleEnum = UserRole.from(role);
 
             switch (roleEnum) {
@@ -99,12 +100,15 @@ public class LoginOtpService {
                     claims.put("role", roleEnum.name());
                     claims.put("username", userAuth.getUsername());
                     claims.put("email", userAuth.getEmailAddress());
+
                     String token = jwtUtils.generateToken(claims, userAuth.getUserId());
                     stringRedisTemplate.opsForValue().set("session:admin:" + userAuth.getUserId(), token, TOKEN_TTL);
                     return new LoginResponse(true, "Login berhasil sebagai " + roleEnum.name(),  token);
                 }
                 default -> throw new BusinessException(HttpStatus.FORBIDDEN, "ROLE_NOT_ALLOWED", "Role tidak diizinkan login");
             }
+
+
 
 
         } catch (BusinessException e) {
