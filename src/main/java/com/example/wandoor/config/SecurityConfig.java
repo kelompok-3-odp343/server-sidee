@@ -66,7 +66,8 @@ public class SecurityConfig {
                 "http://localhost:5173",          // React Dev
                 "https://app-dev.wandoor.my.id",
                 "http://136.110.19.46:30081",  // Dev Server
-                "http://34.87.139.149:30081"
+                "http://34.87.139.149:30081",
+                "http://34.87.139.149:30080"
                 // "https://app.wandoor.my.id",      // Production Frontend
                 // "https://wandoor.web.app"         // (contoh jika hosting di Firebase)
         ));
