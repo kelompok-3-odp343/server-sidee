@@ -25,6 +25,9 @@ public class TrxCategory {
     private String categoryName;
 
     @Column(nullable = false)
+    private String categoryType;
+
+    @Column(nullable = false)
     private String createdBy;
 
     @Column(nullable = false)

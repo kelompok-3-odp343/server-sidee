@@ -5,11 +5,13 @@ WORKDIR /app
 # Salin semua file proyek ke container builder
 COPY . .
 
-# Build menjalankan test
-RUN gradle clean build -x test
+# Build aplikasi menggunakan Gradle, tanpa menjalankan test
+RUN gradle clean build
 
-## Stage 2: Jalankan aplikasi dengan image OpenJDK ringan
+# Stage 2: Menjalankan aplikasi dengan image OpenJDK ringan
 FROM eclipse-temurin:17-jdk
+
+# Set working directory
 WORKDIR /app
 
 # Salin file .jar hasil build dari stage sebelumnya

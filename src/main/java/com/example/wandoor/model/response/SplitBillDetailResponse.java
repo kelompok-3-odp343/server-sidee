@@ -3,24 +3,25 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public record SplitBillDetailResponse (
-    String status,
-    String message,
     Data data
 ) {
     public record Data(
         String splitBillId,
         String splitBillTitle,
         String currency,
+        String transactionId,
+        String refId,
         BigDecimal totalBill,
         String createdTime,
-        String transactionId,
+        String transactionDate,
         List<Member> members
     ) {
         public record Member(
+            String memberId,
             String memberName,
             BigDecimal amount,
-            String status,
-            String paymentTime
+            String paymentTime,
+            Boolean hasPaid
         ) {
         }
     }

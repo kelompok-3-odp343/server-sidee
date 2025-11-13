@@ -2,6 +2,7 @@ package com.example.wandoor.repository;
 
 import com.example.wandoor.model.entity.Account;
 import com.example.wandoor.model.enums.AccountStatus;
+import com.example.wandoor.model.enums.ProductType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -28,5 +29,7 @@ public interface AccountRepository extends JpaRepository<Account, String> {
         List<Account> fetchActiveAccounts(@Param("userId") String userId,
                                           @Param("cif") String cif,
                                           @Param("statuses") Collection<AccountStatus> statuses);
+
+    List<Account> findByUserIdAndCifAndAccountType(String userId, String cif, ProductType productType);
 
 }

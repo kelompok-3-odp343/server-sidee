@@ -25,7 +25,5 @@ public record AddNewSplitBillRequest(
     public record BillMembers(
         @NotBlank String memberName,
         @NotNull BigDecimal amountShare
-    ){
-    }
-
+    ){}
 }

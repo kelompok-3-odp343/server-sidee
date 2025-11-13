@@ -25,9 +25,6 @@ public class RoleManagement {
     private String id;
 
     @Column(nullable = false)
-    private String userId;
-
-    @Column(nullable = false)
     private String roleName;
 
     @Column(nullable = false)

@@ -12,6 +12,8 @@ import java.util.Optional;
 public interface SplitBillRepository extends JpaRepository<SplitBill, String> {
     List<SplitBill> findByUserIdAndCif(String userId, String cif);
     Optional<SplitBill> findByTransactionId(String transactionId);
+    Optional<SplitBill> findByIdAndUserIdAndCifAndTransactionId(String splitBillId, String userId, String Cif, String transactionId);
+    Optional<SplitBill> findByUserIdAndCifAndId(String userId, String cif, String splitBillId);
 
     @Query("""
         SELECT COUNT(sb)

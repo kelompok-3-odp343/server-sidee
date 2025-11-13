@@ -22,6 +22,7 @@ public record SplitBillsListResponse(
         List<SplitBillMemberDetail> splitBillMemberDetail
     ) {
         public record SplitBillMemberDetail(
+                String memberId,
                 String memberName,
                 BigDecimal totalBillAmount,
                 Boolean hasPaid

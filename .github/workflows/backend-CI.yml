@@ -2,9 +2,9 @@ name: CI Wandoor App
 
 on:
   push:
-    branches: ["ci/adam/setup-github-action"]
+    branches: ["staging"]
   pull_request:
-    branches: ["ci/adam/setup-github-action"]
+    branches: ["staging"]
 
 jobs:
   build:
@@ -32,9 +32,6 @@ jobs:
         with:
           java-version: "17"
           distribution: "zulu"
-
-      - name: Give execute permission to gradlew
-        run: chmod +x gradlew
 
       - name: Wait for Oracle DB to be ready
         run: |
@@ -128,8 +125,13 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Push hanya jika hasil scan lolos
-      - name: Push Docker image to DockerHub
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
         uses: docker/build-push-action@v6
         with:
           push: true

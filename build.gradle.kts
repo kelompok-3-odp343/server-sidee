@@ -35,6 +35,14 @@ dependencies {
     implementation("com.auth0:java-jwt:4.4.0")
 	implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("io.soabase.record-builder:record-builder-core:47")
+	// --- Metrics for Prometheus ---
+	implementation("io.micrometer:micrometer-registry-prometheus")
+	// --- Distributed tracing (adds traceId/spanId automatically) ---
+	implementation("io.micrometer:micrometer-tracing-bridge-brave")
+    implementation("io.zipkin.reporter2:zipkin-reporter-brave")
+
+	// --- JSON logging (for LTM / ELK / Loki)
+	implementation("net.logstash.logback:logstash-logback-encoder:7.4")
 
 
     implementation("com.oracle.database.jdbc:ojdbc11:23.4.0.24.05")

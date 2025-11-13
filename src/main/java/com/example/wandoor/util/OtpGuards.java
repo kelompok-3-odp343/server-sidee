@@ -3,41 +3,32 @@ package com.example.wandoor.util;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.List;
 
 @Component
 public class OtpGuards {
-//    private final StringRedisTemplate redis;
-//
-//    private String issueKey(String userId) {
-//        return "otp:issue" + userId;
-//    }
-//
-//    private String attemptskey(String userId){
-//        return "otp:attempts:" + userId;
-//    }
-//
-//    public long onIssue(String userId, Duration window){
-//        var key = issueKey(userId);
-//        var c = redis.opsForValue().increment(key);
-//        if (c != null && c == 1L){
-//            redis.expire(key, window);
-//        }
-//        return c == null ? 0L : c;
-//    }
-//
-//    public long onFail(String userId, Duration window){
-//        var key = attemptskey(userId);
-//        var c = redis.opsForValue().increment(key);
-//        if (c != null && c == 1L){
-//            redis.expire(key, window);
-//        }
-//        return c == null ? 0L : c;
-//    }
-//
-//    public void resetAll(String userId){
-//        redis.delete(List.of(issueKey(userId), attemptskey(userId)));
-//    }
+    private static final int OTP_DIGITS = 6;
+    private static final int OTP_BOUND = 1_000_000; // 10^6
+
+    // reuse SecureRandom instance
+    private static final SecureRandom SECURE_RANDOM = createSecureRandom();
+
+    private OtpGuards() {}
+
+    private static SecureRandom createSecureRandom() {
+        try {
+            return SecureRandom.getInstanceStrong(); // very strong if available
+        } catch (NoSuchAlgorithmException e) {
+            return new SecureRandom(); // fallback
+        }
+    }
+
+    public static String generateNumericOtp() {
+        int value = SECURE_RANDOM.nextInt(OTP_BOUND); // 0 .. 999_999
+        return String.format("%0" + OTP_DIGITS + "d", value);
+    }
 
 }

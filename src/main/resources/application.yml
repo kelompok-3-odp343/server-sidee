@@ -43,9 +43,11 @@ spring:
 
 logging:
   level:
-    org.springframework.security: DEBUG
-    org.springframework.data.redis.core.RedisTemplate: DEBUG
-    io.lettuce.core.protocol: DEBUG
+    root: INFO
+    com.wandoor: INFO
+    org.springframework.security: INFO
+    org.springframework.data.redis.core.RedisTemplate: INFO
+    io.lettuce.core.protocol: INFO
 
 # secret & expiry JWT
 app:
@@ -60,3 +62,18 @@ server:
     include-message: always
     include-binding-errors: always
     include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,prometheus,metrics,loggers"
+  endpoint:
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  health:
+    show-details: always
+

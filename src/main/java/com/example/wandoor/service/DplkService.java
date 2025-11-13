@@ -1,6 +1,7 @@
 package com.example.wandoor.service;
 
 import com.example.wandoor.config.RequestContext;
+import com.example.wandoor.exception.BusinessException;
 import com.example.wandoor.model.response.DplkListResponse;
 import com.example.wandoor.repository.DplkAccountRepository;
 import com.example.wandoor.repository.ProfileRepository;
@@ -29,15 +30,72 @@ public class DplkService {
         var userId = RequestContext.get().getUserId();
         var cif = RequestContext.get().getCif();
 
+
+        try {
+            var items = getDplkItems(userId, cif);
+            var totalBalance = items.stream()
+                    .map(DplkListResponse.Data.Items::accumulatedBalance)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            var fundData = new DplkListResponse.Data(
+                    "Dana Pensiun Lembaga Keuangan (DPLK)",
+                    totalBalance,
+                    items
+            );
+
+            return new DplkListResponse(
+                    "true",
+                    "Pension funds fetched successfully",
+                    List.of(fundData)
+            );
+
+        } catch (BusinessException e) {
+            log.warn("[DPLK] Business error for userId={}, cif={}, message={}", userId, cif, e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("[DPLK] Unexpected error for userId={}, cif={}", userId, cif, e);
+            throw new BusinessException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "UNEXPECTED_ERROR",
+                    "Something went wrong while retrieving DPLK data",
+                    e
+            );
+        }
+    }
+
+    public BigDecimal calculateTotalDplk(String userId, String cif) {
+        try {
+            var items = getDplkItems(userId, cif);
+            return items.stream()
+                    .map(DplkListResponse.Data.Items::accumulatedBalance)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                    .setScale(2, RoundingMode.HALF_UP);
+
+        } catch (BusinessException e) {
+            log.warn("[DPLK] Business error while calculating total for userId={}, cif={}, msg={}", userId, cif, e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("[DPLK] Unexpected error while calculating total for userId={}, cif={}", userId, cif, e);
+            throw new BusinessException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "UNEXPECTED_ERROR",
+                    "Something went wrong while calculating total DPLK balance",
+                    e
+            );
+        }
+    }
+
+    private List<DplkListResponse.Data.Items> getDplkItems(String userId, String cif) {
+
         var userExists = profileRepository.findByIdAndCif(userId, cif)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User Not Found"));
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "INVALID_USER", "User not found"));
 
         var getDplkAccount = dplkAccountRepository.findAllByUserIdAndCif(userId, cif);
         if (getDplkAccount.isEmpty()){
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No DPLK accounts found");
+            throw new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "No DPLK accounts found");
         }
 
-        var items = getDplkAccount.stream().map(
+        return getDplkAccount.stream().map(
                 acc -> {
                     var initialDeposit = acc.getDplkInitialDeposit();
                     var growth = randomGrowth();
@@ -54,23 +112,6 @@ public class DplkService {
                             accumulated
                     );
                 }).toList();
-
-        var title = "apa ya title nya??";
-        var totalBalance = items.stream()
-                .map(DplkListResponse.Data.Items::accumulatedBalance)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        var fundData = new DplkListResponse.Data(
-                title,
-                totalBalance,
-                items
-        );
-
-        return new DplkListResponse(
-                "true",
-                "Pension funds fetch successfully",
-                List.of(fundData)
-        );
     }
 
     private double randomGrowth(){

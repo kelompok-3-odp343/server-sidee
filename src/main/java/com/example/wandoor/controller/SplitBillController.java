@@ -1,8 +1,8 @@
 package com.example.wandoor.controller;
 
+import com.example.wandoor.model.request.EditSplitBillRequest;
 import com.example.wandoor.model.request.SplitBillDetailRequest;
-import com.example.wandoor.model.response.SplitBillDetailResponse;
-import com.example.wandoor.model.response.SplitBillsListResponse;
+import com.example.wandoor.model.response.*;
 import com.example.wandoor.service.SplitBillService;
 
 import com.example.wandoor.model.request.AddNewSplitBillRequest;
@@ -23,7 +23,7 @@ import java.net.URI;
 import java.util.Map;
 
 @RestController
-@RequestMapping("api/split-bill")
+@RequestMapping("api/v1/split-bill")
 @RequiredArgsConstructor
 @Log4j2
 public class SplitBillController {
@@ -36,22 +36,32 @@ public class SplitBillController {
     }
 
     @PostMapping("/detail")
-    public ResponseEntity<SplitBillDetailResponse> getAllSplitBillMember(@Valid @RequestBody SplitBillDetailRequest request){
+    public ResponseEntity<SplitBillDetailResponse> getAllSplitBillMember(@Valid @RequestBody SplitBillDetailRequest request) {
         SplitBillDetailResponse response = splitBillService.getAllSplitBillMember(request);
-        return ResponseEntity.ok(response); }
+        return ResponseEntity.ok(response);
+    }
+
 
     @PostMapping("/add")
-    public ResponseEntity<Map<String, String>> createSplitBill(
-            @Valid @RequestBody AddNewSplitBillRequest request){
+    public ResponseEntity<AddNewSplitBillResponse> createSplitBill(
+            @RequestBody AddNewSplitBillRequest request){
 
+        System.out.println("Split Bill Controller");
         log.info("Receive create split bill request: {}", request.splitBillTitle());
-        String splitBillId = splitBillService.createSplitBill(request);
+        AddNewSplitBillResponse response = splitBillService.createSplitBill(request);
 
         return ResponseEntity
-                .created(URI.create("api/split-bill" + splitBillId))
-                .body(Map.of(
-                        "splitBillId", splitBillId,
-                        "message", "Split bill created successfully"
-                ));
+                .created(URI.create("api/split-bill" + response.splitBillId()))
+                .body(response);
+    }
+
+    @PutMapping("/edit")
+    public ResponseEntity<EditSplitBillResponse> editSplitBill(
+            @Valid @RequestBody EditSplitBillRequest request){
+
+//        log.info("Receive create split bill request: {}", request.splitBillTitle());
+
+        EditSplitBillResponse response = splitBillService.editSplitBill(request);
+        return ResponseEntity.ok(response);
     }
 }

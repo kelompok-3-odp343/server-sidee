@@ -44,6 +44,9 @@ public class Account {
     private String subCat;
 
     @Column(nullable = false)
+    private String productName;
+
+    @Column(nullable = false)
     private String currencyCode;
 
     @Column(nullable = false)
