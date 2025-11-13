@@ -7,7 +7,7 @@ export const options = {
 };
 
 export default function () {
-  const res = http.get('http://127.0.0.1:8081/api/v1/fetch-dashboard'); // ubah ke endpoint kamu
+  const res = http.get('http://127.0.0.1:8081/api/v1/fetch-dashboard'); // endpoint dashboard
   check(res, {
     'status 200': (r) => r.status === 200,
   });
