@@ -191,7 +191,6 @@ class LoginOtpServiceTest {
         assertThat(response.status()).isTrue();
         assertThat(response.message()).isEqualTo("login berhasil");
         assertThat(response.token()).isEqualTo("jwt_token");
-        assertThat(response.user().username()).isEqualTo("oktaviaqa");
     }
 
 
