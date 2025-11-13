@@ -38,15 +38,15 @@ public class AccountService {
         String cif = RequestContext.get().getCif();
 
         try {
-            // ✅ Validasi user berdasarkan JWT context
+            // Validasi user berdasarkan JWT context
             profileRepository.findByIdAndCif(userId, cif)
                     .orElseThrow(() -> new BusinessException(
                             HttpStatus.NOT_FOUND, "INVALID_USER", "User not found"));
 
-            // ✅ Ambil semua akun milik user
+            //Ambil semua akun
             List<Account> allAccounts = accountRepository.findByUserIdAndCif(userId, cif);
 
-            // 🔹 Filter hanya akun dengan accountType = SVG
+            //accountType = SVG
             List<Account> savingsAccounts = allAccounts.stream()
                     .filter(acc -> acc.getAccountType() == ProductType.SVG)
                     .collect(Collectors.toList());
@@ -55,10 +55,9 @@ public class AccountService {
                 throw new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "No savings accounts (SVG) found for this user");
             }
 
-            // ✅ Tentukan akun yang akan ditampilkan (berdasarkan request / akun utama)
             Account selectedAccount = resolveSelectedAccount(savingsAccounts, request);
 
-            // ✅ Bangun object targetAccountDetail (hanya dari akun SVG)
+            // object targetAccountDetail (hanya dari akun SVG)
             TargetAccountDetail targetAccountDetail = TargetAccountDetail.builder()
                     .accountNumber(selectedAccount.getAccountNumber())
                     .accountName(selectedAccount.getAccountHolderName())
@@ -68,13 +67,13 @@ public class AccountService {
                     .accountStatus(selectedAccount.getAccountStatus().name())
                     .build();
 
-            // ✅ Buat daftar akun SVG lainnya
+            //daftar akun SVG lainnya
             List<AccountListItem> otherAccounts = savingsAccounts.stream()
                     .filter(a -> !a.getAccountNumber().equals(selectedAccount.getAccountNumber()))
                     .map(a -> new AccountListItem(a.getAccountNumber()))
                     .collect(Collectors.toList());
 
-            // ✅ Gabungkan hasil ke AccountResponse
+            // Gabungkan hasil
             AccountData accountData = new AccountData(targetAccountDetail, otherAccounts);
             return new AccountResponse(accountData);
 

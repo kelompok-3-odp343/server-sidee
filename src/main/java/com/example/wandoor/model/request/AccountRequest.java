@@ -16,5 +16,5 @@ import lombok.NoArgsConstructor;
 public class AccountRequest {
 
     @JsonProperty("accountNumber")
-    private String accountNumber; // opsional (boleh null)
+    private String accountNumber;
 }
