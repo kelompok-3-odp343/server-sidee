@@ -7,6 +7,6 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class SavingsRequest {
+public class SavingDetailRequest {
     private String accountNumber;
 }

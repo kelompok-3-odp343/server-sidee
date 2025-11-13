@@ -1,0 +1,38 @@
+package com.example.wandoor.controller;
+
+import java.util.Map;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.example.wandoor.model.request.SavingDetailRequest;
+import com.example.wandoor.model.response.SavingDetailResponse;
+import com.example.wandoor.service.SavingDetailService;
+import com.example.wandoor.service.SavingsService;
+
+import lombok.RequiredArgsConstructor;
+
+@RestController
+@RequestMapping("/api/v1")
+@RequiredArgsConstructor
+public class SavingNDetailController {
+
+    private final SavingsService savingsService;
+    private final SavingDetailService savingDetailService;
+
+    @PostMapping("/savings")
+    public ResponseEntity<Map<String, Object>> getSavingsForLoggedInUser() {
+        return ResponseEntity.ok(savingsService.getSavingsForLoggedInUser());
+    }
+
+    @PostMapping("/savings/detail")
+    public ResponseEntity<SavingDetailResponse> getSavingsDetail(
+            @RequestBody(required = false) SavingDetailRequest request
+    ) {
+        var response = savingDetailService.getSavingsDetail(request);
+        return ResponseEntity.ok(response);
+    }
+}
