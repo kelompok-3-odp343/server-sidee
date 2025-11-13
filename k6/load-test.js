@@ -8,6 +8,10 @@ export const options = {
 
 export default function () {
   const res = http.get('http://34.87.139.149/api/v1/fetch-dashboard'); // endpoint dashboard
+
+  console.log(`Status: ${res.status}`);
+  console.log(`Body: ${res.body.substring(0, 200)}`); // lihat isi respons pertama 200 char
+  
   check(res, {
     'status 200': (r) => r.status === 200,
   });
