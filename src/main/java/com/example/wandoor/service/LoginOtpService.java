@@ -90,6 +90,7 @@ public class LoginOtpService {
                     .map(RoleManagement::getRoleName)
                     .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "ROLE_NOT_FOUND", "role not found"));
 
+
             var roleEnum = UserRole.from(role);
 
 
@@ -103,12 +104,15 @@ public class LoginOtpService {
                     claims.put("username", userAuth.getUsername());
                     claims.put("email", userAuth.getEmailAddress());
                     claims.put("npp", adminProfile.getNpp());
+
                     String token = jwtUtils.generateToken(claims, userAuth.getUserId());
                     stringRedisTemplate.opsForValue().set("session:admin:" + userAuth.getUserId(), token, TOKEN_TTL);
                     return new LoginResponse(true, "Login berhasil sebagai " + roleEnum.name(),  token);
                 }
                 default -> throw new BusinessException(HttpStatus.FORBIDDEN, "ROLE_NOT_ALLOWED", "Role tidak diizinkan login");
             }
+
+
 
 
         } catch (BusinessException e) {
@@ -148,7 +152,6 @@ public class LoginOtpService {
                             false,
                             "Terlalu banyak percobaan OTP. Akun diblokir sementara.",
                             null,
-                            null,
                             attemptCount.intValue()
                     );
                 }
@@ -156,7 +159,6 @@ public class LoginOtpService {
                 return new VerifyOtpResponse(
                         false,
                         "OTP salah. Percobaan ke-" + attemptCount + " dari " + MAX_OTP_FAIL + ".",
-                        null,
                         null,
                         attemptCount.intValue()
                 );
@@ -182,14 +184,7 @@ public class LoginOtpService {
             var sessionKey = "session:" + req.sessionId();
             stringRedisTemplate.opsForValue().set(sessionKey, token, TOKEN_TTL);
 
-            var dataUser = new VerifyOtpResponse.User(
-                    userData.getUserId(),
-                    profile.getCif(),
-                    userData.getUsername(),
-                    role
-            );
-
-            return new VerifyOtpResponse(true, "login berhasil", token, dataUser, attemptCount.intValue());
+            return new VerifyOtpResponse(true, "login berhasil", token, attemptCount.intValue());
 
         } catch (BusinessException e) {
             throw e;
