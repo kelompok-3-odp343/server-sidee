@@ -48,6 +48,8 @@ logging:
     org.springframework.security: INFO
     org.springframework.data.redis.core.RedisTemplate: INFO
     io.lettuce.core.protocol: INFO
+    org.springframework.web: DEBUG    #Tambahan untuk Loki
+    org.apache.catalina: DEBUG    #Tambahan untuk Loki
 
 # secret & expiry JWT
 app:
