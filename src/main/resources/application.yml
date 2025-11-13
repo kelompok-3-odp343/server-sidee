@@ -64,6 +64,13 @@ server:
     include-message: always
     include-binding-errors: always
     include-stacktrace: never
+  tomcat:     #Tambahan untuk Loki
+    accesslog:    #Tambahan untuk Loki
+      enabled: true    #Tambahan untuk Loki
+      directory: /var/log/springboot    #Tambahan untuk Loki
+      prefix: access_log  #Tambahan untuk Loki
+      suffix: .log    #Tambahan untuk Loki
+      pattern: "%h %l %u %t \"%r\" %s %b"    #Tambahan untuk Loki
 
 management:
   endpoints:
