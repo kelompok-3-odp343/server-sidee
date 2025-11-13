@@ -64,13 +64,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             var userId = jwt.getClaim("userId").asString();
             var role = jwt.getClaim("role").asString();
             var cif = jwt.getClaim("cif").asString();
-            //TODO Add NPP for Admin
+            var npp = jwt.getClaim("npp").asString();
 
-            if ("NASABAH".equalsIgnoreCase((role)))
-
-            if (!"NASABAH".equalsIgnoreCase(role)) {
-                cif = null;
-            }
+            if (!"NASABAH".equalsIgnoreCase(role)) cif = null;
+            if ("NASABAH".equalsIgnoreCase(role)) npp = null;
 
             MDC.put("userId", userId);
             if (cif != null) MDC.put("cif", cif);
@@ -85,6 +82,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             RequestContext ctx = RequestContext.get();
             ctx.setUserId(userId);
             ctx.setCif(cif);
+            ctx.setNpp(npp);
 
             log.info("🔐 Authenticated user={} role={} cif={}", userId, role, cif != null ? cif : "-");
 
