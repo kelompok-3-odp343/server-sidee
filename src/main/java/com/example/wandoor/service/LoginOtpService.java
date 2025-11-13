@@ -11,6 +11,7 @@ import com.example.wandoor.model.entity.UserAuth;
 import com.example.wandoor.model.enums.UserRole;
 import com.example.wandoor.model.request.*;
 import com.example.wandoor.model.response.*;
+import com.example.wandoor.repository.*;
 import com.example.wandoor.util.OtpGuards;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -20,10 +21,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import com.example.wandoor.model.entity.RoleManagement;
-import com.example.wandoor.repository.ProfileRepository;
-import com.example.wandoor.repository.RoleManagementRepository;
-import com.example.wandoor.repository.UserAuthRepository;
-import com.example.wandoor.repository.UserOtpVerificationRepository;
 import com.example.wandoor.util.Helpers;
 import com.example.wandoor.util.JwtUtils;
 
@@ -44,6 +41,7 @@ public class LoginOtpService {
     private final JwtUtils jwtUtils;
     private final StringRedisTemplate stringRedisTemplate;
     private final BlockUserNow blockUserNow;
+    private final AdminProfileRepository adminProfileRepository;
 
     private static final Duration OTP_TTL = Duration.ofMinutes(3);
     private static final Duration BLOCK_TTL = Duration.ofMinutes(10);
@@ -53,6 +51,7 @@ public class LoginOtpService {
 
     private static final int MAX_LOGIN_FAIL = 3;
     private static final int MAX_OTP_FAIL = 3;
+
 
     @Transactional
     public LoginResponse login(LoginRequest req) {
@@ -64,6 +63,7 @@ public class LoginOtpService {
         try {
             var userAuth = userAuthRepository.findByUsername(username)
                     .orElseThrow(() -> new BusinessException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Username atau Password salah"));
+
 
             if (userAuth.getIsUserBlocked() != null && Integer.valueOf(1).equals(userAuth.getIsUserBlocked())) {
                 throw new BusinessException(HttpStatus.FORBIDDEN, "ACCOUNT_BLOCKED", "Akun diblokir, hubungi CS untuk membuka blokir.");
@@ -92,13 +92,17 @@ public class LoginOtpService {
 
             var roleEnum = UserRole.from(role);
 
+
             switch (roleEnum) {
                 case NASABAH -> { return doNasabahLogin(userAuth); }
                 case MAKER, CHECKER, APPROVAL -> {
+                    var adminProfile = adminProfileRepository.findById(userAuth.getUserId())
+                            .orElseThrow(() -> new BusinessException(HttpStatus.CONFLICT, "NO_SUCH_ADMIN", "No Such Admin"));
                     Map<String, Object> claims = new HashMap<>();
                     claims.put("role", roleEnum.name());
                     claims.put("username", userAuth.getUsername());
                     claims.put("email", userAuth.getEmailAddress());
+                    claims.put("npp", adminProfile.getNpp());
                     String token = jwtUtils.generateToken(claims, userAuth.getUserId());
                     stringRedisTemplate.opsForValue().set("session:admin:" + userAuth.getUserId(), token, TOKEN_TTL);
                     return new LoginResponse(true, "Login berhasil sebagai " + roleEnum.name(),  token);
