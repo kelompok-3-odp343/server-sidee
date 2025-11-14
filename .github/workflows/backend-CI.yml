@@ -37,7 +37,7 @@ jobs:
 
       # Memberikan izin eksekusi pada gradlew
       - name: Give execute permission to gradlew
-        run: ./gradlew clean build -x test
+        run: chmod +x gradlew
 
       # Tunggu Oracle Database siap (listener aktif)
       - name: Wait for Oracle DB to be ready
