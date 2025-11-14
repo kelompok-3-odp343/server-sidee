@@ -42,7 +42,7 @@ spring:
 
 logging:
   file:    # Tambahan untuk Loki
-    path: /var/log/springboot    #Tambahan untuk Loki
+    path: /var/log/springboot/springboot.log    #Tambahan untuk Loki
   level:
     root: INFO    #Tambahan untuk Loki
     org.springframework.web: INFO    #Tambahan untuk Loki
