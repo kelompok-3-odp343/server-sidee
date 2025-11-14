@@ -1,8 +1,10 @@
 package com.example.wandoor.service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import com.example.wandoor.exception.BusinessException;
+import com.example.wandoor.model.entity.Account;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -44,23 +46,40 @@ public class TransactionHistoryService {
             var accountList = accountRepository.fetchActiveAccounts(userId, cif, List.of(AccountStatus.BUKA, AccountStatus.BARU));
             if (accountList.isEmpty()) throw new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND" ,"Account not found");
 
-            var targetAccount = (request.accountNumber() != null && !request.accountNumber().isBlank())
-                    ? accountList.stream().filter(a -> a.getAccountNumber().equals(request.accountNumber()))
-                        .findFirst().orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND" ,"Account not found"))
-                    : accountList.stream().filter(a -> a.getIsMainAccount() == 1).findFirst()
-                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND" , "Main account not found"));
+            var productType = request.productType().toUpperCase();
+
+            var targetAccount = accountList.stream()
+                    .filter(a -> a.getAccountType().name().equalsIgnoreCase(productType))
+                    .filter(a -> !"SAV".equalsIgnoreCase(productType) || a.getAccountNumber().equals(request.accountNumber()))
+                    .toList();
+
+            if (targetAccount.isEmpty()) {
+                throw new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND",
+                        "No accounts found for product type " + productType);
+            }
 
             var month = request.month();
             var year = request.year();
-            List<TrxHistory> trxList = transactionHistoryRepository.findByUserIdAndAccountNumberAndMonthYear(
-                    userId, targetAccount.getAccountNumber(), month, year);
+            List<TrxHistory> trxList = targetAccount.stream()
+                    .flatMap(acc -> transactionHistoryRepository
+                            .findByUserIdAndAccountNumberAndMonthYear(userId, acc.getAccountNumber(), month, year)
+                            .stream())
+                    .toList();
 
-            List<TrxResponse> trxResponse = trxList.stream()
+            var accountSubCatMap = targetAccount.stream()
+                    .collect(Collectors.toMap(Account::getAccountNumber, Account::getSubCat));
+
+            log.info("fetchTransactionHistory request -> size={}, userId={}, cif={}, productType={}, accountNumber={}, month={}, year={}",
+                    trxList.size(), userId, cif, request.productType(), request.accountNumber(), request.month(), request.year());
+
+            var trxResponse = trxList.stream()
                     .map(t -> TrxResponseBuilder.builder()
                             .transactionId(t.getId())
+                            .accountnNumber(t.getAccountNumber())
                             .transactionDate(t.getTransactionDate())
                             .transactionType(t.getTransactionType())
                             .debitCredit(t.getDebitCredit().name())
+                            .productSubCategory(accountSubCatMap.get(t.getAccountNumber()))
                             .partyName(t.getPartyName())
                             .partyDetail(t.getPartyDetail())
                             .amount(t.getTransactionAmount())
@@ -69,8 +88,7 @@ public class TransactionHistoryService {
             return TransactionHistoryResponseBuilder.builder()
                     .month(request.month())
                     .year(String.valueOf(request.year()))
-                    .productType(targetAccount.getAccountType().name())
-                    .productSubCategory(targetAccount.getSubCat())
+                    .productType(targetAccount.get(0).getAccountType().name())
                     .transaction(trxResponse)
                     .build();
         } catch (BusinessException e) {

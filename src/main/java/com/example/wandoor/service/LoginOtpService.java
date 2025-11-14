@@ -106,17 +106,14 @@ public class LoginOtpService {
 
             var roleEnum = UserRole.from(role);
 
-
             switch (roleEnum) {
                 case NASABAH -> { return doNasabahLogin(userAuth); }
                 case MAKER, CHECKER, APPROVAL -> {
-                    var adminProfile = adminProfileRepository.findById(userAuth.getUserId())
-                            .orElseThrow(() -> new BusinessException(HttpStatus.CONFLICT, "NO_SUCH_ADMIN", "No Such Admin"));
                     Map<String, Object> claims = new HashMap<>();
                     claims.put("role", roleEnum.name());
                     claims.put("username", userAuth.getUsername());
                     claims.put("email", userAuth.getEmailAddress());
-                    claims.put("npp", adminProfile.getNpp());
+//                    claims.put("npp", adminProfile.getNpp());
 
                     String token = jwtUtils.generateToken(claims, userAuth.getUserId());
                     stringRedisTemplate.opsForValue().set("session:admin:" + userAuth.getUserId(), token, TOKEN_TTL);
@@ -125,12 +122,10 @@ public class LoginOtpService {
                 default -> throw new BusinessException(HttpStatus.FORBIDDEN, "ROLE_NOT_ALLOWED", "Role tidak diizinkan login");
             }
 
-
-
-
         } catch (BusinessException e) {
             throw e;
         }  catch (Exception e) {
+            log.info("kenapa ya", e);
             throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UNEXPECTED_ERROR", "Something went wrong while login", e);
         }
 
@@ -191,7 +186,7 @@ public class LoginOtpService {
             Map<String, Object> claims = new HashMap<>();
             claims.put("role", role);
             claims.put("username", userData.getUsername());
-            claims.put("cif", profile.getCif());
+//            claims.put("cif", profile.getCif());
             var token = jwtUtils.generateToken(claims, userData.getUserId());
 
             var sessionKey = "session:" + req.sessionId();
@@ -202,6 +197,7 @@ public class LoginOtpService {
         } catch (BusinessException e) {
             throw e;
         }  catch (Exception e) {
+            log.info("kenapa ya", e);
             throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UNEXPECTED_ERROR", "Something went wrong while verify OTP", e);
         }
     }
