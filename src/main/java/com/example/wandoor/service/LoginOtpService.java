@@ -6,23 +6,37 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import com.example.wandoor.exception.BusinessException;
-import com.example.wandoor.model.entity.UserAuth;
-import com.example.wandoor.model.enums.UserRole;
-import com.example.wandoor.model.request.*;
-import com.example.wandoor.model.response.*;
-import com.example.wandoor.repository.*;
-import com.example.wandoor.util.OtpGuards;
-import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+
+import com.example.wandoor.exception.BusinessException;
 import com.example.wandoor.model.entity.RoleManagement;
+import com.example.wandoor.model.entity.UserAuth;
+import com.example.wandoor.model.enums.UserRole;
+import com.example.wandoor.model.request.ForgotPasswordRequest;
+import com.example.wandoor.model.request.LoginRequest;
+import com.example.wandoor.model.request.ResendOtpRequest;
+import com.example.wandoor.model.request.ResetPasswordRequest;
+import com.example.wandoor.model.request.VerifyOtpRequest;
+import com.example.wandoor.model.response.BaseResponse;
+import com.example.wandoor.model.response.ForgotPasswordResponse;
+import com.example.wandoor.model.response.LoginResponse;
+import com.example.wandoor.model.response.LogoutResponse;
+import com.example.wandoor.model.response.ResendOtpResponse;
+import com.example.wandoor.model.response.VerifyForgotOtpResponse;
+import com.example.wandoor.model.response.VerifyOtpResponse;
+import com.example.wandoor.repository.AdminProfileRepository;
+import com.example.wandoor.repository.ProfileRepository;
+import com.example.wandoor.repository.RoleManagementRepository;
+import com.example.wandoor.repository.UserAuthRepository;
+import com.example.wandoor.repository.UserOtpVerificationRepository;
 import com.example.wandoor.util.Helpers;
 import com.example.wandoor.util.JwtUtils;
+import com.example.wandoor.util.OtpGuards;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -90,6 +104,7 @@ public class LoginOtpService {
                     .map(RoleManagement::getRoleName)
                     .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "ROLE_NOT_FOUND", "role not found"));
 
+
             var roleEnum = UserRole.from(role);
 
 
@@ -109,6 +124,8 @@ public class LoginOtpService {
                 }
                 default -> throw new BusinessException(HttpStatus.FORBIDDEN, "ROLE_NOT_ALLOWED", "Role tidak diizinkan login");
             }
+
+
 
 
         } catch (BusinessException e) {
