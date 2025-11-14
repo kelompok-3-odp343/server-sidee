@@ -12,7 +12,6 @@ public record TransactionHistoryResponse(
         Integer month,
         String year,
         String productType,
-        String productSubCategory,
         List<TrxResponse> transaction
 ) {
 
