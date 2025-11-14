@@ -75,7 +75,7 @@ public class TransactionHistoryService {
             var trxResponse = trxList.stream()
                     .map(t -> TrxResponseBuilder.builder()
                             .transactionId(t.getId())
-                            .accountnNumber(t.getAccountNumber())
+                            .accountNumber(t.getAccountNumber())
                             .transactionDate(t.getTransactionDate())
                             .transactionType(t.getTransactionType())
                             .debitCredit(t.getDebitCredit().name())
