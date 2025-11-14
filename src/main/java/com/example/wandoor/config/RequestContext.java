@@ -10,6 +10,7 @@ public class RequestContext {
 
     private String userId;
     private String cif;
+    private String npp;
 
     public static RequestContext get() {
         return CONTEXT.get();

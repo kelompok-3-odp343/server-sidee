@@ -54,6 +54,7 @@ public class LoginOtpService {
     private final JwtUtils jwtUtils;
     private final StringRedisTemplate stringRedisTemplate;
     private final BlockUserNow blockUserNow;
+    private final AdminProfileRepository adminProfileRepository;
 
     private static final Duration OTP_TTL = Duration.ofMinutes(3);
     private static final Duration BLOCK_TTL = Duration.ofMinutes(10);
@@ -63,6 +64,7 @@ public class LoginOtpService {
 
     private static final int MAX_LOGIN_FAIL = 3;
     private static final int MAX_OTP_FAIL = 3;
+
 
     @Transactional
     public LoginResponse login(LoginRequest req) {
@@ -74,6 +76,7 @@ public class LoginOtpService {
         try {
             var userAuth = userAuthRepository.findByUsername(username)
                     .orElseThrow(() -> new BusinessException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Username atau Password salah"));
+
 
             if (userAuth.getIsUserBlocked() != null && Integer.valueOf(1).equals(userAuth.getIsUserBlocked())) {
                 throw new BusinessException(HttpStatus.FORBIDDEN, "ACCOUNT_BLOCKED", "Akun diblokir, hubungi CS untuk membuka blokir.");
@@ -100,21 +103,29 @@ public class LoginOtpService {
                     .map(RoleManagement::getRoleName)
                     .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "ROLE_NOT_FOUND", "role not found"));
 
+
             var roleEnum = UserRole.from(role);
+
 
             switch (roleEnum) {
                 case NASABAH -> { return doNasabahLogin(userAuth); }
                 case MAKER, CHECKER, APPROVAL -> {
+                    var adminProfile = adminProfileRepository.findById(userAuth.getUserId())
+                            .orElseThrow(() -> new BusinessException(HttpStatus.CONFLICT, "NO_SUCH_ADMIN", "No Such Admin"));
                     Map<String, Object> claims = new HashMap<>();
                     claims.put("role", roleEnum.name());
                     claims.put("username", userAuth.getUsername());
                     claims.put("email", userAuth.getEmailAddress());
+                    claims.put("npp", adminProfile.getNpp());
+
                     String token = jwtUtils.generateToken(claims, userAuth.getUserId());
                     stringRedisTemplate.opsForValue().set("session:admin:" + userAuth.getUserId(), token, TOKEN_TTL);
                     return new LoginResponse(true, "Login berhasil sebagai " + roleEnum.name(),  token);
                 }
                 default -> throw new BusinessException(HttpStatus.FORBIDDEN, "ROLE_NOT_ALLOWED", "Role tidak diizinkan login");
             }
+
+
 
 
         } catch (BusinessException e) {
@@ -154,7 +165,6 @@ public class LoginOtpService {
                             false,
                             "Terlalu banyak percobaan OTP. Akun diblokir sementara.",
                             null,
-                            null,
                             attemptCount.intValue()
                     );
                 }
@@ -162,7 +172,6 @@ public class LoginOtpService {
                 return new VerifyOtpResponse(
                         false,
                         "OTP salah. Percobaan ke-" + attemptCount + " dari " + MAX_OTP_FAIL + ".",
-                        null,
                         null,
                         attemptCount.intValue()
                 );
@@ -188,14 +197,7 @@ public class LoginOtpService {
             var sessionKey = "session:" + req.sessionId();
             stringRedisTemplate.opsForValue().set(sessionKey, token, TOKEN_TTL);
 
-            var dataUser = new VerifyOtpResponse.User(
-                    userData.getUserId(),
-                    profile.getCif(),
-                    userData.getUsername(),
-                    role
-            );
-
-            return new VerifyOtpResponse(true, "login berhasil", token, dataUser, attemptCount.intValue());
+            return new VerifyOtpResponse(true, "login berhasil", token, attemptCount.intValue());
 
         } catch (BusinessException e) {
             throw e;
