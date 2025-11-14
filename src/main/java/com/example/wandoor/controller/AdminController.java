@@ -24,6 +24,26 @@ import com.example.wandoor.service.DetailUserAdminService;
 
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.example.wandoor.model.request.DetailUserAdminRequest;
+import com.example.wandoor.model.request.TransactionListRequest;
+import com.example.wandoor.model.response.DetailUserAdminResponse;
+import com.example.wandoor.model.response.TransactionListResponse;
+import com.example.wandoor.service.AdminMenuAccessService;
+import com.example.wandoor.service.DetailUserAdminService;
+import com.example.wandoor.service.TransactionListService;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
@@ -33,6 +53,7 @@ public class AdminController {
     private final AdminTransactionListService service;
     private final AdminMenuAccessService adminMenuAccessService;
     private final AdminApproverListService adminApproverListService;
+    private final TransactionListService transactionService;
 
     @PostMapping("/detail-user")
     public ResponseEntity<DetailUserAdminResponse> getDetail(@RequestBody DetailUserAdminRequest request) {
@@ -61,4 +82,11 @@ public class AdminController {
 
 
 
+    @PostMapping("/transaction/list")
+    @PreAuthorize("hasAnyRole('MAKER', 'CHECKER', 'APPROVAL')")
+    public ResponseEntity<TransactionListResponse> getTransactionList(@RequestBody TransactionListRequest request) {
+        log.info("📩 Request received to fetch transaction list for userId={}", request.getUserId());
+        TransactionListResponse response = transactionService.getTransactionList(request);
+        return ResponseEntity.ok(response);
+    }
 }
