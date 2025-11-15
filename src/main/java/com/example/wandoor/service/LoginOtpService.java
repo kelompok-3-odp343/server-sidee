@@ -55,6 +55,7 @@ public class LoginOtpService {
 
     @Transactional
     public LoginResponse login(LoginRequest req) {
+        System.out.println("New Password:" + passwordEncoder.encode("123456"));
         var username = req.username();
         if (username == null || username.isBlank()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Username harus diisi");
@@ -101,7 +102,6 @@ public class LoginOtpService {
                             .orElseThrow(() -> new BusinessException(HttpStatus.CONFLICT, "NO_SUCH_ADMIN", "No Such Admin"));
                     Map<String, Object> claims = new HashMap<>();
                     claims.put("role", roleEnum.name());
-                    claims.put("username", userAuth.getUsername());
                     claims.put("email", userAuth.getEmailAddress());
                     claims.put("npp", adminProfile.getNpp());
 
