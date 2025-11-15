@@ -2,7 +2,7 @@ package com.example.wandoor.service;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -24,7 +24,7 @@ public class SavingsService {
     private final AccountRepository accountRepository;
 
     @Transactional(readOnly = true)
-    public Map<String, Object> getSavingsForLoggedInUser() {
+    public SavingsResponse getSavingsForLoggedInUser() {
         RequestContext ctx = RequestContext.get();
         String userId = ctx.getUserId();
         String cif = ctx.getCif();
@@ -33,77 +33,54 @@ public class SavingsService {
             throw new IllegalStateException("User ID atau CIF tidak ditemukan (JWT invalid)");
         }
 
-        // 🔹 Ambil semua akun user dan filter hanya yang bertipe SVG (savings)
-        List<Account> savingsAccounts = accountRepository.findByUserIdAndCif(userId, cif)
+        List<Account> savingsAccounts = Optional.ofNullable(accountRepository.findByUserIdAndCif(userId, cif))
+                .orElse(Collections.emptyList())
                 .stream()
-                .filter(acc -> acc.getAccountType() == ProductType.SVG)
+                .filter(acc -> acc.getAccountType() == ProductType.SVG || acc.getAccountType() == ProductType.SAV)
                 .collect(Collectors.toList());
 
-        if (savingsAccounts.isEmpty()) {
-            return Map.of("data", new SavingsResponse(null, List.of()));
-        }
-
-        // 🔹 Hitung total saldo semua akun savings (SVG saja)
         BigDecimal totalEffectiveBalance = savingsAccounts.stream()
-                .map(Account::getEffectiveBalance)
+                .map(a -> a.getEffectiveBalance() == null ? BigDecimal.ZERO : a.getEffectiveBalance())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // 🔹 Buat daftar akun savings dengan detail lengkap
         List<SavingsResponse.AccountListItem> accountList = savingsAccounts.stream()
-                .map(acc -> SavingsResponse.AccountListItem.builder()
-                        .accountNumber(acc.getAccountNumber())
-                        .accountName(acc.getAccountHolderName())
-                        .productName(acc.getProductName()) // dari entity Account
-                        .effectiveBalanceTotal(acc.getEffectiveBalance())
-                        .isMainAccount(acc.getIsMainAccount() == 1)
-                        .accountStatus(acc.getAccountStatus().name())
-                        .build())
+                .map(acc -> new SavingsResponse.AccountListItem(
+                        acc.getAccountNumber(),
+                        acc.getAccountHolderName(),
+                        acc.getProductName(),
+                        acc.getEffectiveBalance() == null ? BigDecimal.ZERO : acc.getEffectiveBalance(),
+                        acc.getIsMainAccount() != null && acc.getIsMainAccount() == 1,
+                        acc.getAccountStatus() == null ? null : acc.getAccountStatus().name()
+                ))
                 .collect(Collectors.toList());
 
-        // 🔹 Bungkus total saldo dalam objek targetAccountDetail
-        SavingsResponse.TargetAccountDetail targetAccountDetail =
-                SavingsResponse.TargetAccountDetail.builder()
-                        .totalEffectiveBalance(totalEffectiveBalance)
-                        .build();
-
-        // 🔹 Bentuk response akhir
-        SavingsResponse response = SavingsResponse.builder()
-                .targetAccountDetail(targetAccountDetail)
-                .accountList(accountList)
-                .build();
-
-        return Map.of("data", response);
+        SavingsResponse.TargetAccountDetail target = new SavingsResponse.TargetAccountDetail(totalEffectiveBalance);
+        return new SavingsResponse(target, accountList.isEmpty() ? null : accountList);
     }
 
     @Transactional(readOnly = true)
-    public Map<String, Object> getSavingsDetail(String accountNumber) {
+    public SavingsResponse.AccountListItem getSavingsDetail(String accountNumber) {
         RequestContext ctx = RequestContext.get();
         String userId = ctx.getUserId();
         String cif = ctx.getCif();
 
-        Optional<Account> accountOpt = accountRepository
-                .findByUserIdAndCifAndAccountNumber(userId, cif, accountNumber);
-
+        Optional<Account> accountOpt = accountRepository.findByUserIdAndCifAndAccountNumber(userId, cif, accountNumber);
         if (accountOpt.isEmpty()) {
-            return Map.of("message", "Account not found or not owned by user");
+            throw new IllegalStateException("Account not found or not owned by user");
         }
 
         Account acc = accountOpt.get();
-
-        // 🔹 Validasi bahwa account ini bertipe SVG
-        if (acc.getAccountType() != ProductType.SVG) {
-            return Map.of("message", "Account is not a savings (SVG) account");
+        if (acc.getAccountType() != ProductType.SVG && acc.getAccountType() != ProductType.SAV) {
+            throw new IllegalStateException("Account is not a savings account");
         }
 
-        var detail = SavingsResponse.AccountListItem.builder()
-                .accountNumber(acc.getAccountNumber())
-                .accountName(acc.getAccountHolderName())
-                .productName(acc.getProductName())
-                .effectiveBalanceTotal(acc.getEffectiveBalance())
-                .isMainAccount(acc.getIsMainAccount() == 1)
-                .accountStatus(acc.getAccountStatus().name())
-                .build();
-
-        return Map.of("data", detail);
+        return new SavingsResponse.AccountListItem(
+                acc.getAccountNumber(),
+                acc.getAccountHolderName(),
+                acc.getProductName(),
+                acc.getEffectiveBalance() == null ? BigDecimal.ZERO : acc.getEffectiveBalance(),
+                acc.getIsMainAccount() != null && acc.getIsMainAccount() == 1,
+                acc.getAccountStatus() == null ? null : acc.getAccountStatus().name()
+        );
     }
 }
