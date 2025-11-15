@@ -11,8 +11,8 @@ export default function () {
   const loginRes = http.post(
     'http://34.87.139.149:30080/api/auth/login',
     JSON.stringify({
-      username: 'P007',  // ganti sesuai usermu
-      password: '123456'   // ganti sesuai passwordmu
+      username: 'HEHSJS',  // ganti sesuai usermu
+      password: '1029'   // ganti sesuai passwordmu
     }),
     { headers: { 'Content-Type': 'application/json' } }
   );
