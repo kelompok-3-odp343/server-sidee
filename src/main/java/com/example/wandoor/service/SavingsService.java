@@ -14,6 +14,7 @@ import com.example.wandoor.model.entity.Account;
 import com.example.wandoor.model.enums.ProductType;
 import com.example.wandoor.model.response.SavingsResponse;
 import com.example.wandoor.repository.AccountRepository;
+import com.example.wandoor.repository.ProfileRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -22,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 public class SavingsService {
 
     private final AccountRepository accountRepository;
+    private final ProfileRepository profileRepository;
 
     @Transactional(readOnly = true)
     public SavingsResponse getSavingsForLoggedInUser() {
@@ -29,8 +31,16 @@ public class SavingsService {
         String userId = ctx.getUserId();
         String cif = ctx.getCif();
 
-        if (userId == null || cif == null) {
-            throw new IllegalStateException("User ID atau CIF tidak ditemukan (JWT invalid)");
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalStateException("User ID tidak ditemukan (JWT invalid)");
+        }
+        if (cif == null || cif.isBlank()) {
+            cif = profileRepository.findById(userId)
+                    .map(p -> p.getCif())
+                    .orElse(null);
+        }
+        if (cif == null || cif.isBlank()) {
+            throw new IllegalStateException("CIF tidak ditemukan di token maupun profil");
         }
 
         List<Account> savingsAccounts = Optional.ofNullable(accountRepository.findByUserIdAndCif(userId, cif))
@@ -63,6 +73,9 @@ public class SavingsService {
         RequestContext ctx = RequestContext.get();
         String userId = ctx.getUserId();
         String cif = ctx.getCif();
+        if (cif == null || cif.isBlank()) {
+            cif = profileRepository.findById(userId).map(p -> p.getCif()).orElse(null);
+        }
 
         Optional<Account> accountOpt = accountRepository.findByUserIdAndCifAndAccountNumber(userId, cif, accountNumber);
         if (accountOpt.isEmpty()) {

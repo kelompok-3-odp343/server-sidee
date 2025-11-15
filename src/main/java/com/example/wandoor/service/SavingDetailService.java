@@ -18,6 +18,7 @@ import com.example.wandoor.exception.BusinessException;
 import com.example.wandoor.model.entity.Account;
 import com.example.wandoor.model.entity.TrxHistory;
 import com.example.wandoor.model.enums.ProductType;
+import com.example.wandoor.model.enums.DebitCredit;
 import com.example.wandoor.model.request.SavingDetailRequest;
 import com.example.wandoor.model.response.SavingDetailResponse;
 import com.example.wandoor.model.response.SavingDetailResponse.BiggestIncoming;
@@ -53,8 +54,9 @@ public class SavingDetailService {
         try {
             String userId = RequestContext.get().getUserId();
             String cif = RequestContext.get().getCif();
-
-            // 2️⃣ Validasi user
+            if (cif == null || cif.isBlank()) {
+                cif = profileRepository.findById(userId).map(p -> p.getCif()).orElse(null);
+            }
             profileRepository.findByIdAndCif(userId, cif)
                     .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND" ,  "User not found"));
 
@@ -73,7 +75,6 @@ public class SavingDetailService {
                 return buildEmptyResponse(selectedAccount);
             }
 
-            // 6️⃣ Hitung total debit, kredit, dan pertumbuhan bersih
             Summary summary = calculateSummary(trxList);
 
             // 7️⃣ Temukan kategori pengeluaran dan transaksi masuk terbesar
@@ -114,8 +115,8 @@ public class SavingDetailService {
      * Hitung total debit, kredit, dan net growth
      */
     private Summary calculateSummary(List<TrxHistory> trxList) {
-        BigDecimal totalDebit = sumByType(trxList, "DEBIT");
-        BigDecimal totalCredit = sumByType(trxList, "CREDIT");
+        BigDecimal totalDebit = sumByDebitCredit(trxList, DebitCredit.D);
+        BigDecimal totalCredit = sumByDebitCredit(trxList, DebitCredit.C);
         BigDecimal netGrowth = totalCredit.subtract(totalDebit);
         return new Summary(totalDebit, totalCredit, netGrowth);
     }
@@ -123,9 +124,9 @@ public class SavingDetailService {
     /**
      * Helper untuk menjumlahkan transaksi berdasarkan tipe
      */
-    private BigDecimal sumByType(List<TrxHistory> trxList, String type) {
+    private BigDecimal sumByDebitCredit(List<TrxHistory> trxList, DebitCredit dc) {
         return trxList.stream()
-                .filter(t -> type.equalsIgnoreCase(t.getTransactionType()))
+                .filter(t -> t.getDebitCredit() == dc)
                 .map(TrxHistory::getTransactionAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
@@ -136,7 +137,7 @@ public class SavingDetailService {
     private Insights calculateInsights(List<TrxHistory> trxList) {
         // Ambil kategori pengeluaran terbesar
         Map<String, BigDecimal> debitByCategory = trxList.stream()
-                .filter(t -> "DEBIT".equalsIgnoreCase(t.getTransactionType()))
+                .filter(t -> t.getDebitCredit() == DebitCredit.D)
                 .collect(Collectors.groupingBy(
                         t -> Optional.ofNullable(t.getPaymentMethod()).orElse("Other"),
                         Collectors.reducing(BigDecimal.ZERO, TrxHistory::getTransactionAmount, BigDecimal::add)
@@ -149,7 +150,7 @@ public class SavingDetailService {
 
         // Ambil transaksi masuk (CREDIT) terbesar
         Optional<TrxHistory> biggestIncomingTrx = trxList.stream()
-                .filter(t -> "CREDIT".equalsIgnoreCase(t.getTransactionType()))
+                .filter(t -> t.getDebitCredit() == DebitCredit.C)
                 .max(Comparator.comparing(TrxHistory::getTransactionAmount));
 
         BiggestIncoming biggestIncoming = biggestIncomingTrx.map(t -> {
@@ -175,7 +176,7 @@ public class SavingDetailService {
      */
     private List<CategoryBreakdown> calculateCategoryBreakdown(List<TrxHistory> trxList) {
         Map<String, BigDecimal> debitByCategory = trxList.stream()
-                .filter(t -> "DEBIT".equalsIgnoreCase(t.getTransactionType()))
+                .filter(t -> t.getDebitCredit() == DebitCredit.D)
                 .collect(Collectors.groupingBy(
                         t -> Optional.ofNullable(t.getTransactionDescription()).orElse("Other"),
                         Collectors.reducing(BigDecimal.ZERO, TrxHistory::getTransactionAmount, BigDecimal::add)

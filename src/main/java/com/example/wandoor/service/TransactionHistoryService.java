@@ -12,9 +12,9 @@ import com.example.wandoor.model.entity.TrxHistory;
 import com.example.wandoor.model.enums.AccountStatus;
 import com.example.wandoor.model.request.TransactionHistoryRequest;
 import com.example.wandoor.model.response.TransactionHistoryResponse;
-import com.example.wandoor.model.response.TransactionHistoryResponseBuilder;
+
 import com.example.wandoor.model.response.TrxResponse;
-import com.example.wandoor.model.response.TrxResponseBuilder;
+
 import com.example.wandoor.repository.AccountRepository;
 import com.example.wandoor.repository.ProfileRepository;
 import com.example.wandoor.repository.TrxHistoryRepository;
@@ -56,23 +56,24 @@ public class TransactionHistoryService {
                     userId, targetAccount.getAccountNumber(), month, year);
 
             List<TrxResponse> trxResponse = trxList.stream()
-                    .map(t -> TrxResponseBuilder.builder()
-                            .transactionId(t.getId())
-                            .transactionDate(t.getTransactionDate())
-                            .transactionType(t.getTransactionType())
-                            .debitCredit(t.getDebitCredit().name())
-                            .partyName(t.getPartyName())
-                            .partyDetail(t.getPartyDetail())
-                            .amount(t.getTransactionAmount())
-                            .build()).toList();
+                    .map(t -> new TrxResponse(
+                            t.getId(),
+                            t.getTransactionDate(),
+                            t.getTransactionType(),
+                            t.getDebitCredit().name(),
+                            t.getPartyName(),
+                            t.getPartyDetail(),
+                            t.getTransactionAmount()
+                    ))
+                    .toList();
 
-            return TransactionHistoryResponseBuilder.builder()
-                    .month(request.month())
-                    .year(String.valueOf(request.year()))
-                    .productType(targetAccount.getAccountType().name())
-                    .productSubCategory(targetAccount.getSubCat())
-                    .transaction(trxResponse)
-                    .build();
+            return new TransactionHistoryResponse(
+                    request.month(),
+                    String.valueOf(request.year()),
+                    targetAccount.getAccountType().name(),
+                    targetAccount.getSubCat(),
+                    trxResponse
+            );
         } catch (BusinessException e) {
             throw e;
         }  catch (Exception e) {
