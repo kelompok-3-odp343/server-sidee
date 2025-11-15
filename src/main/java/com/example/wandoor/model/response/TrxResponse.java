@@ -9,8 +9,10 @@ import java.time.LocalDateTime;
 @RecordBuilder
 public record TrxResponse(
         String transactionId,
+        String accountNumber,
         LocalDateTime transactionDate,
         String transactionType,
+        String productSubCategory,
         String debitCredit,
         String partyName,
         String partyDetail,

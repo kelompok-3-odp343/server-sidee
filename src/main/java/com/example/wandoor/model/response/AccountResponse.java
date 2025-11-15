@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -28,11 +29,11 @@ public class AccountResponse {
     @AllArgsConstructor
     @NoArgsConstructor
     public static class TargetAccountDetail {
-        private String account_number;
-        private String account_name;
-        private String product_name;
-        private BigDecimal effective_balance;
-        private boolean is_main_account;
+        private String accountNumber;
+        private String accountHolderName;
+        private String productType;
+        private BigDecimal effectiveBalance;
+        private boolean isMainAccount;
         private String account_status;
     }
 

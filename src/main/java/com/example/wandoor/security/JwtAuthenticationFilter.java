@@ -49,6 +49,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
+//        if (userIdHeader == null || cifHeader == null) {
+//            unauthorized(response, "Unauthorized - Missing userId or cif header");
+//            return;
+//        }
+
         var token = header.substring(7);
 
         try {
@@ -105,5 +110,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         res.setCharacterEncoding("UTF-8");
         res.setContentType("application/json");
         res.getWriter().write("{\"status\":false,\"message\":\"" + msg + "\"}");
+        res.flushBuffer();
     }
 }
