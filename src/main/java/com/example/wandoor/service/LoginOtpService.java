@@ -111,7 +111,6 @@ public class LoginOtpService {
                 case MAKER, CHECKER, APPROVAL -> {
                     Map<String, Object> claims = new HashMap<>();
                     claims.put("role", roleEnum.name());
-                    claims.put("username", userAuth.getUsername());
                     claims.put("email", userAuth.getEmailAddress());
 //                    claims.put("npp", adminProfile.getNpp());
 
