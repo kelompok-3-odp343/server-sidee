@@ -29,7 +29,7 @@ export default function () {
   console.log("TOKEN:", token);
 
   // 2️⃣ FETCH DASHBOARD
-  const dashRes = http.get('http://34.87.139.149/api/v1/fetch-dashboard', {
+  const dashRes = http.get('http://34.87.139.149:30080/api/v1/fetch-dashboard', {
     headers: {
       Authorization: `Bearer ${token}`,
     },
