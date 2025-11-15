@@ -2,9 +2,9 @@ name: CI Wandoor App
 
 on:
   push:
-    branches: ["staging"]
+    branches: ["ci/adam/setup-github-action"]
   pull_request:
-    branches: ["staging"]
+    branches: ["ci/adam/setup-github-action"]
 
 jobs:
   build:
