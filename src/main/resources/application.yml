@@ -94,6 +94,5 @@ management:
   
 otel:
   resource:
-    attributes:
-      service.name: backend-service
+    attributes: service.name=backend-service
 
