@@ -85,4 +85,15 @@ management:
       application: ${spring.application.name}
   health:
     show-details: always
+  tracing:
+    enabled: true
+  
+  otlp:
+    tracing:
+      endpoint: http://otel-collector.monitoring.svc.cluster.local:4318
+  
+otel:
+  resource:
+    attributes:
+      service.name: backend-service
 
