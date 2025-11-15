@@ -55,7 +55,6 @@ public class LoginOtpService {
 
     @Transactional
     public LoginResponse login(LoginRequest req) {
-        System.out.println("New Password:" + passwordEncoder.encode("123456"));
         var username = req.username();
         if (username == null || username.isBlank()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Username harus diisi");
