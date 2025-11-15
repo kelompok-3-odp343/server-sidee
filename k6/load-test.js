@@ -2,7 +2,7 @@ import http from 'k6/http';
 import { sleep } from 'k6';
 
 export const options = {
-  vus: 20,
+  vus: 1,
   duration: '10s',
 };
 
@@ -29,14 +29,14 @@ export default function () {
   console.log("TOKEN:", token);
 
   // 2️⃣ FETCH DASHBOARD
-  // const dashRes = http.get('http://34.87.139.149/api/v1/fetch-dashboard', {
-  //   headers: {
-  //     Authorization: `Bearer ${token}`,
-  //   },
-  // });
+  const dashRes = http.get('http://34.87.139.149/api/v1/fetch-dashboard', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 
-  // console.log("Dashboard Status:", dashRes.status);
-  // console.log("Dashboard Body:", dashRes.body);
+  console.log("Dashboard Status:", dashRes.status);
+  console.log("Dashboard Body:", dashRes.body);
 
-  // sleep(1);
+  sleep(1);
 }
