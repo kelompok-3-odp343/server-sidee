@@ -126,23 +126,30 @@ jobs:
             jrtr1/wandoor-backend-app:backend-latest
 
       # === Update tag di repo infra ===
-      - name: Checkout infra repository
+      - name: Checkout infra repository (staging branch)
         uses: actions/checkout@v3
         with:
           repository: kelompok-3-odp343/infra
           token: ${{ secrets.ACCESS_TOKEN }}
           path: infra
+          ref: staging
 
       - name: Update image tag in backend deployment
         run: |
           cd infra/k3s/backend-wandoor
           sed -i "s|jrtr1/wandoor-backend-app:.*|jrtr1/wandoor-backend-app:backend-${{ github.sha }}|g" backend-deployment.yaml
 
-      - name: Commit and push updated image tag
+      - name: Commit and push updated image tag to staging branch
         run: |
           cd infra
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Tambahkan perintah untuk memastikan tidak error jika tidak ada perubahan
           git add .
-          git commit -m "Update backend image tag to backend-${{ github.sha }}"
-          git push origin main
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Update backend image tag to backend-${{ github.sha }}"
+            git push origin staging
+          fi
