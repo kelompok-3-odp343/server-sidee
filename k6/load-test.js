@@ -1,19 +1,42 @@
 import http from 'k6/http';
-import { sleep, check } from 'k6';
+import { sleep } from 'k6';
 
 export const options = {
-  vus: 1,          // jumlah virtual user
-  duration: '10s',  // lama test
+  vus: 1,
+  duration: '10s',
 };
 
 export default function () {
-  const res = http.get('http://34.87.139.149/api/v1/fetch-dashboard'); // endpoint dashboard
+  // 1️⃣ LOGIN DULU
+  const loginRes = http.post(
+    'http://34.87.139.149:30080/api/auth/login',
+    JSON.stringify({
+      username: 'P007',  // ganti sesuai usermu
+      password: '123456'   // ganti sesuai passwordmu
+    }),
+    { headers: { 'Content-Type': 'application/json' } }
+  );
 
-  console.log(`Status: ${res.status}`);
-  console.log(`Body: ${res.body.substring(0, 200)}`); // lihat isi respons pertama 200 char
-  
-  check(res, {
-    'status 200': (r) => r.status === 200,
-  });
-  sleep(1);
+  console.log("LOGIN RAW:", loginRes.body);
+
+  let token;
+  try {
+    token = JSON.parse(loginRes.body).token;
+  } catch (e) {
+    console.log("Gagal parsing token!");
+  }
+
+  console.log("TOKEN:", token);
+
+  // 2️⃣ FETCH DASHBOARD
+  // const dashRes = http.get('http://34.87.139.149/api/v1/fetch-dashboard', {
+  //   headers: {
+  //     Authorization: `Bearer ${token}`,
+  //   },
+  // });
+
+  // console.log("Dashboard Status:", dashRes.status);
+  // console.log("Dashboard Body:", dashRes.body);
+
+  // sleep(1);
 }
