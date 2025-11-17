@@ -5,8 +5,10 @@ import com.example.wandoor.exception.BusinessException;
 import com.example.wandoor.model.entity.AdminProfile;
 import com.example.wandoor.model.entity.TrActivity;
 import com.example.wandoor.model.request.AdminActivityDetailRequest;
+import com.example.wandoor.model.request.AdminBlockUserRequest;
 import com.example.wandoor.model.response.ActivityDetailResponse;
 import com.example.wandoor.model.response.ActivityListResponse;
+import com.example.wandoor.model.response.AdminActivityCreationResponse;
 import com.example.wandoor.repository.AdminProfileRepository;
 import com.example.wandoor.repository.RoleManagementRepository;
 import com.example.wandoor.repository.TrActivityRepository;
@@ -218,6 +220,17 @@ public class AdminService {
             // throw new RuntimeException("Failed to read clob", e);
             return Collections.emptyMap();
 
+        }
+    }
+
+    public AdminActivityCreationResponse adminBlockUser(AdminBlockUserRequest request) {
+        try {
+            return AdminActivityCreationResponse.builder().build();
+
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to fetch Admin Activity List");
         }
     }
 }

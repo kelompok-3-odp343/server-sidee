@@ -20,4 +20,8 @@ public interface UserAuthRepository extends JpaRepository<UserAuth, String> {
     @Query("update UserAuth u set u.isUserBlocked = 1 where u.userId = :userId and (u.isUserBlocked is null or u.isUserBlocked <> 1)")
     int markBlockedById(@Param("userId") String userId);
 
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update UserAuth u set u.isUserBlocked = 0 where u.userId = :userId and (u.isUserBlocked is null or u.isUserBlocked <> 0)")
+    int markUnblockedById(@Param("userId") String userId);
+
 }
