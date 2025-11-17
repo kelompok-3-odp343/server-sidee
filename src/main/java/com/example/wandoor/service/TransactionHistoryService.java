@@ -115,16 +115,15 @@ public class TransactionHistoryService {
             var userExists = profileRepository.findByIdAndCif(userId, cif)
                     .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "User Not Found"));
 
-            //TODO should use trx.categoryId
-//            var trxCategpry = trxCategoryRepository.findById(transactionId)
-//                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "Category Not Found"));
+            var trxCategpry = trxCategoryRepository.findById(trx.getCategoryId())
+                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "Category Not Found"));
 
             return DetailTrxResponse.builder()
                     .transactionId(trx.getId())
                     .accountNumber(trx.getAccountNumber())
                     .transactionDate(trx.getTransactionDate())
                     .paymentMethod(trx.getPaymentMethod())
-//                    .transactionCategory(trxCategpry.getCategoryName())
+                    .transactionCategory(trxCategpry.getCategoryName())
                     .partyName(trx.getPartyName())
                     .partyDetail(trx.getPartyDetail())
                     .amount(trx.getTransactionAmount())
