@@ -28,5 +28,4 @@ public interface SplitBillRepository extends JpaRepository<SplitBill, String> {
         WHERE sb.userId = :userId AND sb.cif = :cif AND sb.isDeleted = 0
     """)
     BigDecimal sumTotalBillByCreator(@Param("userId") String userId, @Param("cif") String cif);
-
 }

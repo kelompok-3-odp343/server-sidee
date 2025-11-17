@@ -3,6 +3,7 @@ package com.example.wandoor.model.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.Columns;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.math.BigDecimal;
