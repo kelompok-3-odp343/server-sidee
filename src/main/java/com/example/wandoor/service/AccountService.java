@@ -11,6 +11,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.wandoor.config.RequestContext;
 import com.example.wandoor.model.entity.Account;
+import com.example.wandoor.model.enums.AccountStatus;
+import com.example.wandoor.model.enums.ProductType;
 import com.example.wandoor.model.request.AccountRequest;
 import com.example.wandoor.model.response.AccountResponse;
 import com.example.wandoor.model.response.AccountResponse.AccountData;
@@ -39,8 +41,12 @@ public class AccountService {
             profileRepository.findByIdAndCif(userId, cif)
                     .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "INVALID_USER", "User not found"));
 
-            // Ambil semua akun milik user
-            List<Account> accounts = accountRepository.findByUserIdAndCif(userId, cif);
+            // Ambil semua akun milik user, filter hanya savings (SVG/SAV) untuk target
+            List<Account> accounts = Optional.ofNullable(accountRepository.findByUserIdAndCif(userId, cif))
+                    .orElse(List.of())
+                    .stream()
+                    .filter(a -> a.getAccountType() == ProductType.SVG || a.getAccountType() == ProductType.SAV)
+                    .collect(Collectors.toList());
             if (accounts == null || accounts.isEmpty()) {
                 throw new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND" ,"Data account not found");
             }
@@ -67,18 +73,17 @@ public class AccountService {
 
             //targetAccountDetail
             TargetAccountDetail targetAccountDetail = new TargetAccountDetail(
-
                     selectedAccount.getAccountNumber(),
                     selectedAccount.getAccountHolderName(),
                     selectedAccount.getProductName(),
-                    selectedAccount.getEffectiveBalance(),
-                    selectedAccount.getIsMainAccount() == 1,
-                    selectedAccount.getAccountStatus().toString()
+                    selectedAccount.getEffectiveBalance() == null ? java.math.BigDecimal.ZERO : selectedAccount.getEffectiveBalance(),
+                    selectedAccount.getIsMainAccount() != null && selectedAccount.getIsMainAccount() == 1,
+                    selectedAccount.getAccountStatus() == null ? null : selectedAccount.getAccountStatus().name()
             );
 
-            // daftar akun selain yang ditampilkan)
+            // daftar akun selain main account (hanya akun non-main)
             List<AccountListItem> otherAccounts = accounts.stream()
-                    .filter(a -> !a.getAccountNumber().equals(selectedAccount.getAccountNumber()))
+                    .filter(a -> a.getIsMainAccount() == null || a.getIsMainAccount() != 1)
                     .map(a -> new AccountListItem(a.getAccountNumber()))
                     .collect(Collectors.toList());
 
