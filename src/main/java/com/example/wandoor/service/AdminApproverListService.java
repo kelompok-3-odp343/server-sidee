@@ -25,39 +25,31 @@ public class AdminApproverListService {
     private final AdminProfileRepository adminProfileRepository;
 
     public GenericResponse<List<AdminApproverDataResponse>> getApproverList(AdminApproverListRequest request){
-        try {
-                var adminUserId = RequestContext.get().getUserId();
-                var adminProfileData = adminProfileRepository.findById(adminUserId)
-                        .orElseThrow(() -> new BusinessException(
-                                HttpStatus.CONFLICT,
-                                "NO_SUCH_ADMIN",
-                                "No Such Admin"
-                        ));
+        var adminUserId = RequestContext.get().getUserId();
+        adminProfileRepository.findById(adminUserId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.CONFLICT,
+                        "NO_SUCH_ADMIN",
+                        "No Such Admin"
+                ));
 
-                var roleData = roleManagementRepository.findByRoleName(request.getRoleName())
-                        .orElseThrow(() -> new BusinessException(HttpStatus.CONFLICT, "INVALID_ROLE_NAME", "Invalid Role Name"));
-                var approverList = adminProfileRepository.findByRoleId(roleData.getId());
+        var roleData = roleManagementRepository.findByRoleName(request.getRoleName())
+                .orElseThrow(() -> new BusinessException(HttpStatus.CONFLICT, "INVALID_ROLE_NAME", "Invalid Role Name"));
+        var approverList = adminProfileRepository.findByRoleId(roleData.getId());
 
-                List<AdminApproverDataResponse> responses = approverList.stream()
-                        .map(item -> AdminApproverDataResponse.builder()
-                                .userId(item.getId())
-                                .npp(item.getNpp())
-                                .fullName(item.getFullName())
-                                .displayName(item.getNpp() + " - " + item.getFullName())
-                                .roleId(item.getRoleId())
-                                .roleName(roleData.getRoleName())
-                                .build())
-                        .toList();
+        List<AdminApproverDataResponse> responses = approverList.stream()
+                .map(item -> AdminApproverDataResponse.builder()
+                        .userId(item.getId())
+                        .npp(item.getNpp())
+                        .fullName(item.getFullName())
+                        .displayName(item.getNpp() + " - " + item.getFullName())
+                        .roleId(item.getRoleId())
+                        .roleName(roleData.getRoleName())
+                        .build())
+                .toList();
 
-                return GenericResponse.<List<AdminApproverDataResponse>>builder()
-                        .data(responses)
-                        .build();
-
-        } catch (ResponseStatusException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to fetch split bills");
-
-        }
+        return GenericResponse.<List<AdminApproverDataResponse>>builder()
+                .data(responses)
+                .build();
     }
 }

@@ -1,0 +1,5 @@
+ALTER TABLE TR_ACTIVITY ADD(
+    menu_name VARCHAR2(50) NOT NULL,
+    action_flow VARCHAR2(50) NOT NULL,
+    action_menu VARCHAR2(50) NOT NULL
+);
