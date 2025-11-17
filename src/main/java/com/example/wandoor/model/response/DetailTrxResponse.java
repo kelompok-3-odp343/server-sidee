@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 @Builder
 public record DetailTrxResponse(
         String transactionId,
+        String accountNumber,
         LocalDateTime transactionDate,
         String transactionType,
         String paymentMethod,       // QRIS / E-Wallet / Transfer / VA
@@ -15,7 +16,6 @@ public record DetailTrxResponse(
         String partyName,
         String partyDetail,
         BigDecimal amount,
-        String debitCredit,
-        String productSubCategory
+        String debitCredit
 ) {
 }

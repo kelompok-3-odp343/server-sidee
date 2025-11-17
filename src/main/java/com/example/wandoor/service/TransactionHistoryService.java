@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 import com.example.wandoor.exception.BusinessException;
 import com.example.wandoor.model.entity.Account;
 import com.example.wandoor.model.response.*;
+import com.example.wandoor.repository.TrxCategoryRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -30,6 +31,7 @@ public class TransactionHistoryService {
     private final ProfileRepository profileRepository;
     private final AccountRepository accountRepository;
     private final TrxHistoryRepository transactionHistoryRepository;
+    private final TrxCategoryRepository trxCategoryRepository;
 
     public TransactionHistoryResponse fetchTransactionHistory(TransactionHistoryRequest request){
         var userId = RequestContext.get().getUserId();
@@ -106,16 +108,20 @@ public class TransactionHistoryService {
             var userExists = profileRepository.findByIdAndCif(userId, cif)
                     .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "User Not Found"));
 
+            //TODO should use trx.categoryId
+            var trxCategpry = trxCategoryRepository.findById(transactionId)
+                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "Category Not Found"));
+
             return DetailTrxResponse.builder()
                     .transactionId(trx.getId())
+                    .accountNumber(trx.getAccountNumber())
                     .transactionDate(trx.getTransactionDate())
                     .paymentMethod(trx.getPaymentMethod())
-//                    .transactionCategory(trx.get)
+                    .transactionCategory(trxCategpry.getCategoryName())
                     .partyName(trx.getPartyName())
                     .partyDetail(trx.getPartyDetail())
                     .amount(trx.getTransactionAmount())
                     .debitCredit(trx.getDebitCredit().name())
-//                    .productSubCategory()
                     .build();
         } catch (BusinessException e){
             throw e;
