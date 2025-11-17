@@ -113,12 +113,10 @@ public class LoginOtpService {
                 default -> throw new BusinessException(HttpStatus.FORBIDDEN, "ROLE_NOT_ALLOWED", "Role tidak diizinkan login");
             }
 
-
-
-
         } catch (BusinessException e) {
             throw e;
         }  catch (Exception e) {
+            log.info("kenapa ya", e);
             throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UNEXPECTED_ERROR", "Something went wrong while login", e);
         }
 
