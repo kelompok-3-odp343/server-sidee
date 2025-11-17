@@ -23,7 +23,7 @@ public class AdminApproverListService {
 
     public GenericResponse<List<AdminApproverDataResponse>> getApproverList(AdminApproverListRequest request){
         var adminUserId = RequestContext.get().getUserId();
-        var adminProfileData = adminProfileRepository.findById(adminUserId)
+        adminProfileRepository.findById(adminUserId)
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.CONFLICT,
                         "NO_SUCH_ADMIN",

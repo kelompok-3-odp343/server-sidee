@@ -68,12 +68,14 @@ public class LoginOtpService {
 
     @Transactional
     public LoginResponse login(LoginRequest req) {
+
         var username = req.username();
         if (username == null || username.isBlank()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Username harus diisi");
         }
 
         try {
+            System.out.println("New Password = " + passwordEncoder.encode("123456"));
             var userAuth = userAuthRepository.findByUsername(username)
                     .orElseThrow(() -> new BusinessException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Username atau Password salah"));
 

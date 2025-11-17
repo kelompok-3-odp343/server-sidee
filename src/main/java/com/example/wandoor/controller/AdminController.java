@@ -1,12 +1,13 @@
 package com.example.wandoor.controller;
 
+import com.example.wandoor.model.entity.TrActivity;
+import com.example.wandoor.model.request.AdminActivityDetailRequest;
 import com.example.wandoor.model.request.AdminApproverListRequest;
 import com.example.wandoor.model.request.DetailUserAdminRequest;
-import com.example.wandoor.model.response.AdminApproverDataResponse;
-import com.example.wandoor.model.response.DetailUserAdminResponse;
-import com.example.wandoor.model.response.GenericResponse;
+import com.example.wandoor.model.response.*;
 import com.example.wandoor.service.AdminApproverListService;
 import com.example.wandoor.service.AdminMenuAccessService;
+import com.example.wandoor.service.AdminService;
 import com.example.wandoor.service.DetailUserAdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +24,7 @@ public class AdminController {
     private final DetailUserAdminService detailUserAdminService;
     private final AdminMenuAccessService adminMenuAccessService;
     private final AdminApproverListService adminApproverListService;
+    private final AdminService adminService;
 
     @PostMapping("/detail-user")
     public ResponseEntity<DetailUserAdminResponse> getDetail(@RequestBody DetailUserAdminRequest request) {
@@ -44,6 +46,17 @@ public class AdminController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/activity/list")
+    public ResponseEntity<ActivityListResponse> getActivityList() {
+        var response = adminService.getAllActivityPerAdmin();
+        return ResponseEntity.ok(response);
+    }
 
-
+    @PostMapping("/activity/detail")
+    public ResponseEntity<ActivityDetailResponse> getActivityDetail(
+            @RequestBody AdminActivityDetailRequest request
+            ) {
+        ActivityDetailResponse response = adminService.getActivityDetail(request);
+        return ResponseEntity.ok(response);
+    }
 }

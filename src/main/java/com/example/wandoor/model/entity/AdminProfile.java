@@ -26,7 +26,7 @@ public class AdminProfile {
     @Column(nullable = false)
     private String roleId;
     @Column(nullable = false)
-    private String emailAdress;
+    private String emailAddress;
     @Column(nullable = false)
     private LocalDateTime createdTime;
     @Column(nullable = false)
