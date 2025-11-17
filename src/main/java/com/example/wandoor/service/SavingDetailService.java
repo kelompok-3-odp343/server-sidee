@@ -12,8 +12,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Service;
 
 import com.example.wandoor.config.RequestContext;
@@ -33,6 +31,8 @@ import com.example.wandoor.model.response.SavingDetailResponse.TopCategory;
 import com.example.wandoor.repository.AccountRepository;
 import com.example.wandoor.repository.ProfileRepository;
 import com.example.wandoor.repository.TrxHistoryRepository;
+import com.example.wandoor.repository.TrxCategoryRepository;
+import com.example.wandoor.model.entity.TrxCategory;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -45,9 +45,9 @@ public class SavingDetailService {
     private final ProfileRepository profileRepository;
     private final AccountRepository accountRepository;
     private final TrxHistoryRepository trxHistoryRepository;
+    private final TrxCategoryRepository trxCategoryRepository;
 
-    @PersistenceContext
-    private EntityManager entityManager;
+    
 
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
     private static final DateTimeFormatter ISO_DATETIME_WITH_ZONE = DateTimeFormatter.ISO_DATE_TIME;
@@ -81,16 +81,37 @@ public class SavingDetailService {
                 return buildEmptyResponse(selectedAccount);
             }
 
-            Summary summary = calculateSummary(trxList);
+            int targetMonth = java.time.LocalDate.now().getMonthValue();
+            int targetYear = java.time.LocalDate.now().getYear();
+            List<TrxHistory> monthList = trxList.stream()
+                    .filter(t -> t.getTransactionDate() != null
+                            && t.getTransactionDate().getMonthValue() == targetMonth
+                            && t.getTransactionDate().getYear() == targetYear)
+                    .collect(Collectors.toList());
+
+            if (monthList.isEmpty()) {
+                return buildEmptyResponse(selectedAccount);
+            }
+
+            Summary summary = calculateSummary(monthList);
+
+            Map<String, String> categoryMap = trxCategoryRepository.findAll().stream()
+                    .collect(Collectors.toMap(
+                            TrxCategory::getId,
+                            c -> {
+                                String name = c.getCategoryName();
+                                return name == null ? "" : name;
+                            }
+                    ));
 
             // 7️⃣ Temukan kategori pengeluaran dan transaksi masuk terbesar
-            Insights insights = calculateInsights(selectedAccount.getAccountNumber(), trxList);
+            Insights insights = calculateInsights(selectedAccount.getAccountNumber(), monthList, categoryMap);
 
             // 8️⃣ Hitung breakdown kategori (persentase pengeluaran per kategori)
-            List<CategoryBreakdown> breakdown = calculateCategoryBreakdown(selectedAccount.getAccountNumber(), trxList);
+            List<CategoryBreakdown> breakdown = calculateCategoryBreakdown(selectedAccount.getAccountNumber(), monthList, categoryMap);
 
             // 9️⃣ Ambil meta (bulan transaksi + mata uang)
-            Meta meta = buildMeta(trxList, selectedAccount);
+            Meta meta = buildMeta(monthList, selectedAccount);
 
             // 🚀 10️⃣ Kembalikan response lengkap
             return new SavingDetailResponse(meta, summary, insights, breakdown);
@@ -140,30 +161,43 @@ public class SavingDetailService {
     /**
      * Temukan kategori utama dan transaksi masuk terbesar
      */
-    private Insights calculateInsights(String accountNumber, List<TrxHistory> trxList) {
-        List<Object[]> freqRows = nativeCountDebitByCategory(accountNumber);
-        TopCategory topCategory = freqRows.stream()
-                .findFirst()
-                .map(r -> new TopCategory(r[0] == null ? "" : r[0].toString(), new BigDecimal(r[2].toString())))
-                .orElseGet(() -> {
-                    Map<String, Long> freq = new HashMap<>();
-                    Map<String, BigDecimal> amountByCat = new HashMap<>();
-                    trxList.stream()
-                            .filter(t -> t.getDebitCredit() == DebitCredit.D)
-                            .forEach(t -> {
-                                String cat = Optional.ofNullable(t.getPaymentMethod()).orElse("Other");
-                                freq.merge(cat, 1L, Long::sum);
-                                amountByCat.merge(cat, t.getTransactionAmount(), BigDecimal::add);
-                            });
-                    return freq.entrySet().stream()
-                            .max(Map.Entry.comparingByValue())
-                            .map(e -> new TopCategory(e.getKey(), amountByCat.getOrDefault(e.getKey(), BigDecimal.ZERO)))
-                            .orElse(null);
-                });
+    private Insights calculateInsights(String accountNumber, List<TrxHistory> trxList, Map<String, String> categoryMap) {
+        Map<String, Long> countByCategory = trxList.stream()
+                .filter(t -> t.getDebitCredit() == DebitCredit.D)
+                .collect(Collectors.groupingBy(
+                        t -> {
+                            String key = t.getCategoryId();
+                            String name = key == null ? null : categoryMap.getOrDefault(key, key);
+                            return (name == null || name.isBlank()) ? "Uncategorized" : name;
+                        }, Collectors.counting()
+                ));
 
-        // Ambil transaksi masuk (CREDIT) terbesar
+        Map<String, BigDecimal> sumByCategory = trxList.stream()
+                .filter(t -> t.getDebitCredit() == DebitCredit.D)
+                .collect(Collectors.groupingBy(
+                        t -> {
+                            String key = t.getCategoryId();
+                            String name = key == null ? null : categoryMap.getOrDefault(key, key);
+                            return (name == null || name.isBlank()) ? "Uncategorized" : name;
+                        }, Collectors.mapping(TrxHistory::getTransactionAmount,
+                                Collectors.reducing(BigDecimal.ZERO, BigDecimal::add))
+                ));
+
+        TopCategory topCategory = countByCategory.entrySet().stream()
+                .sorted((e1, e2) -> {
+                    int cmp = Long.compare(e2.getValue(), e1.getValue());
+                    if (cmp != 0) return cmp;
+                    BigDecimal s1 = sumByCategory.getOrDefault(e1.getKey(), BigDecimal.ZERO);
+                    BigDecimal s2 = sumByCategory.getOrDefault(e2.getKey(), BigDecimal.ZERO);
+                    return s2.compareTo(s1);
+                })
+                .findFirst()
+                .map(e -> new TopCategory(e.getKey(), sumByCategory.getOrDefault(e.getKey(), BigDecimal.ZERO)))
+                .orElse(null);
+
+        // Ambil transaksi masuk (debit) terbesar
         Optional<TrxHistory> biggestIncomingTrx = trxList.stream()
-                .filter(t -> t.getDebitCredit() == DebitCredit.C)
+                .filter(t -> t.getDebitCredit() == DebitCredit.D)
                 .max(Comparator.comparing(TrxHistory::getTransactionAmount));
 
         BiggestIncoming biggestIncoming = biggestIncomingTrx.map(t -> {
@@ -190,68 +224,34 @@ public class SavingDetailService {
     /**
      * Buat breakdown kategori (pengeluaran per kategori + persen)
      */
-    private List<CategoryBreakdown> calculateCategoryBreakdown(String accountNumber, List<TrxHistory> trxList) {
-        List<Object[]> rows = nativeSumDebitByCategory(accountNumber);
-        if (!rows.isEmpty()) {
-            BigDecimal totalSpent = rows.stream()
-                    .map(r -> new BigDecimal(r[1].toString()))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+    private List<CategoryBreakdown> calculateCategoryBreakdown(String accountNumber, List<TrxHistory> trxList, Map<String, String> categoryMap) {
+        Map<String, BigDecimal> totals = trxList.stream()
+                .filter(t -> t.getDebitCredit() == DebitCredit.C)
+                .collect(Collectors.groupingBy(
+                        t -> {
+                            String key = t.getCategoryId();
+                            String name = key == null ? null : categoryMap.getOrDefault(key, key);
+                            return (name == null || name.isBlank()) ? "Uncategorized" : name;
+                        }, Collectors.mapping(TrxHistory::getTransactionAmount,
+                                Collectors.reducing(BigDecimal.ZERO, BigDecimal::add))
+                ));
 
-            return rows.stream()
-                    .map(r -> {
-                        BigDecimal val = new BigDecimal(r[1].toString());
-                        int percent = totalSpent.compareTo(BigDecimal.ZERO) > 0
-                                ? val.multiply(BigDecimal.valueOf(100)).divide(totalSpent, 0, RoundingMode.HALF_UP).intValue()
-                                : 0;
-                        return new CategoryBreakdown(r[0] == null ? "" : r[0].toString(), val, percent);
-                    })
-                    .sorted(Comparator.comparing(CategoryBreakdown::getTotal_amount).reversed())
-                    .collect(Collectors.toList());
-        }
+        if (totals.isEmpty()) return List.of();
 
-        Map<String, BigDecimal> debitByCategory = new HashMap<>();
-        trxList.stream()
-                .filter(t -> t.getDebitCredit() == DebitCredit.D)
-                .forEach(t -> {
-                    String cat = Optional.ofNullable(t.getPaymentMethod()).orElse("Other");
-                    debitByCategory.merge(cat, t.getTransactionAmount(), BigDecimal::add);
-                });
-
-        BigDecimal totalSpent = debitByCategory.values().stream()
+        BigDecimal totalSpent = totals.values().stream()
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        return debitByCategory.entrySet().stream()
+        return totals.entrySet().stream()
                 .map(e -> {
+                    BigDecimal val = e.getValue();
                     int percent = totalSpent.compareTo(BigDecimal.ZERO) > 0
-                            ? e.getValue().multiply(BigDecimal.valueOf(100)).divide(totalSpent, 0, RoundingMode.HALF_UP).intValue()
+                            ? val.multiply(BigDecimal.valueOf(100)).divide(totalSpent, 0, RoundingMode.HALF_UP).intValue()
                             : 0;
-                    return new CategoryBreakdown(e.getKey(), e.getValue(), percent);
+                    return new CategoryBreakdown(e.getKey(), val, percent);
                 })
                 .sorted(Comparator.comparing(CategoryBreakdown::getTotal_amount).reversed())
                 .collect(Collectors.toList());
 
-    }
-
-    private List<Object[]> nativeSumDebitByCategory(String accountNumber) {
-        String sql = "SELECT c.CATEGORY_NAME AS categoryName, COALESCE(SUM(t.TRANSACTION_AMOUNT), 0) AS total "
-                + "FROM WANDOOR.TRX_HISTORY t "
-                + "JOIN WANDOOR.TRX_CATEGORY c ON c.ID = t.CATEGORY_ID "
-                + "WHERE t.ACCOUNT_NUMBER = :accountNumber AND t.DEBIT_CREDIT = 'D' "
-                + "GROUP BY c.CATEGORY_NAME ORDER BY total DESC";
-        return entityManager.createNativeQuery(sql)
-                .setParameter("accountNumber", accountNumber)
-                .getResultList();
-    }
-
-    private List<Object[]> nativeCountDebitByCategory(String accountNumber) {
-        String sql = "SELECT c.CATEGORY_NAME AS categoryName, COUNT(*) AS cnt, COALESCE(SUM(t.TRANSACTION_AMOUNT), 0) AS total "
-                + "FROM WANDOOR.TRX_HISTORY t "
-                + "JOIN WANDOOR.TRX_CATEGORY c ON c.ID = t.CATEGORY_ID "
-                + "WHERE t.ACCOUNT_NUMBER = :accountNumber AND t.DEBIT_CREDIT = 'D' "
-                + "GROUP BY c.CATEGORY_NAME ORDER BY cnt DESC";
-        return entityManager.createNativeQuery(sql)
-                .setParameter("accountNumber", accountNumber)
-                .getResultList();
     }
 
     /**
