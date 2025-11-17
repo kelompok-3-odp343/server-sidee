@@ -5,6 +5,7 @@ import java.util.stream.Collectors;
 
 import com.example.wandoor.exception.BusinessException;
 import com.example.wandoor.model.entity.Account;
+import com.example.wandoor.model.response.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -13,10 +14,6 @@ import com.example.wandoor.config.RequestContext;
 import com.example.wandoor.model.entity.TrxHistory;
 import com.example.wandoor.model.enums.AccountStatus;
 import com.example.wandoor.model.request.TransactionHistoryRequest;
-import com.example.wandoor.model.response.TransactionHistoryResponse;
-import com.example.wandoor.model.response.TransactionHistoryResponseBuilder;
-import com.example.wandoor.model.response.TrxResponse;
-import com.example.wandoor.model.response.TrxResponseBuilder;
 import com.example.wandoor.repository.AccountRepository;
 import com.example.wandoor.repository.ProfileRepository;
 import com.example.wandoor.repository.TrxHistoryRepository;
@@ -95,6 +92,37 @@ public class TransactionHistoryService {
             throw e;
         }  catch (Exception e) {
             throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UNEXPECTED_ERROR", "Something went wrong while retrieving transaction history data", e);
+        }
+    }
+
+    public DetailTrxResponse fetchTransactionDetail(String transactionId){
+        var userId = RequestContext.get().getUserId();
+        var cif = RequestContext.get().getCif();
+
+        try {
+            var trx = transactionHistoryRepository.findById(transactionId)
+                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "Transaction Not  Found"));
+
+            var userExists = profileRepository.findByIdAndCif(userId, cif)
+                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "User Not Found"));
+
+            return DetailTrxResponse.builder()
+                    .transactionId(trx.getId())
+                    .transactionDate(trx.getTransactionDate())
+                    .paymentMethod(trx.getPaymentMethod())
+//                    .transactionCategory(trx.get)
+                    .partyName(trx.getPartyName())
+                    .partyDetail(trx.getPartyDetail())
+                    .amount(trx.getTransactionAmount())
+                    .debitCredit(trx.getDebitCredit().name())
+//                    .productSubCategory()
+                    .build();
+        } catch (BusinessException e){
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error while fetching transaction detail", e);
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UNEXPECTED_ERROR",
+                    "Something went wrong while retrieving transaction detail", e);
         }
     }
 }
