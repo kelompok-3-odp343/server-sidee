@@ -68,6 +68,19 @@ jobs:
       # Verifikasi image sudah ada
       - name: Verify Docker image exists
         run: docker images | grep jrtr1/wandoor-backend-app
+
+      # Cache Trivy binary agar tidak download setiap run
+      - name: Cache Trivy binary
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/trivy
+          key: trivy-binary-v0.56.1-Linux-X64
+          restore-keys: trivy-binary-
+
+      # Install Trivy
+      - name: Setup Trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
       
       # 1. Scan Docker image (PRIORITAS UTAMA)
       - name: Run Trivy vulnerability scanner
