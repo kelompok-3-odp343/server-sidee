@@ -6,36 +6,23 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import com.example.wandoor.exception.BusinessException;
+import com.example.wandoor.model.entity.UserAuth;
+import com.example.wandoor.model.enums.UserRole;
+import com.example.wandoor.model.request.*;
+import com.example.wandoor.model.response.*;
+import com.example.wandoor.repository.*;
+import com.example.wandoor.util.OtpGuards;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-
-import com.example.wandoor.exception.BusinessException;
 import com.example.wandoor.model.entity.RoleManagement;
-import com.example.wandoor.model.entity.UserAuth;
-import com.example.wandoor.model.enums.UserRole;
-import com.example.wandoor.model.request.ForgotPasswordRequest;
-import com.example.wandoor.model.request.LoginRequest;
-import com.example.wandoor.model.request.ResendOtpRequest;
-import com.example.wandoor.model.request.ResetPasswordRequest;
-import com.example.wandoor.model.request.VerifyOtpRequest;
-import com.example.wandoor.model.response.BaseResponse;
-import com.example.wandoor.model.response.ForgotPasswordResponse;
-import com.example.wandoor.model.response.LoginResponse;
-import com.example.wandoor.model.response.LogoutResponse;
-import com.example.wandoor.model.response.ResendOtpResponse;
-import com.example.wandoor.model.response.VerifyForgotOtpResponse;
-import com.example.wandoor.model.response.VerifyOtpResponse;
-import com.example.wandoor.repository.ProfileRepository;
-import com.example.wandoor.repository.RoleManagementRepository;
-import com.example.wandoor.repository.UserAuthRepository;
-import com.example.wandoor.repository.UserOtpVerificationRepository;
 import com.example.wandoor.util.Helpers;
 import com.example.wandoor.util.JwtUtils;
-import com.example.wandoor.util.OtpGuards;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -54,7 +41,7 @@ public class LoginOtpService {
     private final JwtUtils jwtUtils;
     private final StringRedisTemplate stringRedisTemplate;
     private final BlockUserNow blockUserNow;
-//    private final AdminProfileRepository adminProfileRepository;
+    private final AdminProfileRepository adminProfileRepository;
 
     private static final Duration OTP_TTL = Duration.ofMinutes(3);
     private static final Duration BLOCK_TTL = Duration.ofMinutes(10);
@@ -108,14 +95,16 @@ public class LoginOtpService {
 
             var roleEnum = UserRole.from(role);
 
+
             switch (roleEnum) {
                 case NASABAH -> { return doNasabahLogin(userAuth); }
                 case MAKER, CHECKER, APPROVAL -> {
+                    var adminProfile = adminProfileRepository.findById(userAuth.getUserId())
+                            .orElseThrow(() -> new BusinessException(HttpStatus.CONFLICT, "NO_SUCH_ADMIN", "No Such Admin"));
                     Map<String, Object> claims = new HashMap<>();
                     claims.put("role", roleEnum.name());
-                    claims.put("username", userAuth.getUsername());
                     claims.put("email", userAuth.getEmailAddress());
-//                    claims.put("npp", adminProfile.getNpp());
+                    claims.put("npp", adminProfile.getNpp());
 
                     String token = jwtUtils.generateToken(claims, userAuth.getUserId());
                     stringRedisTemplate.opsForValue().set("session:admin:" + userAuth.getUserId(), token, TOKEN_TTL);
@@ -124,10 +113,12 @@ public class LoginOtpService {
                 default -> throw new BusinessException(HttpStatus.FORBIDDEN, "ROLE_NOT_ALLOWED", "Role tidak diizinkan login");
             }
 
+
+
+
         } catch (BusinessException e) {
             throw e;
         }  catch (Exception e) {
-            log.info("kenapa ya", e);
             throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UNEXPECTED_ERROR", "Something went wrong while login", e);
         }
 
@@ -152,7 +143,7 @@ public class LoginOtpService {
             // counter attempt
             if (!req.otpCode().equals(storedOtp)) {
                 attemptCount = stringRedisTemplate.opsForValue().increment(verifyAttemptKey);
-            if (attemptCount == 1) stringRedisTemplate.expire(verifyAttemptKey, OTP_TTL);
+                if (attemptCount == 1) stringRedisTemplate.expire(verifyAttemptKey, OTP_TTL);
                 log.warn("OTP salah (attempt ke {}) untuk user {}", attemptCount, username);
 
                 if (attemptCount >= MAX_OTP_FAIL) {
@@ -188,7 +179,7 @@ public class LoginOtpService {
             Map<String, Object> claims = new HashMap<>();
             claims.put("role", role);
             claims.put("username", userData.getUsername());
-//            claims.put("cif", profile.getCif());
+            claims.put("cif", profile.getCif());
             var token = jwtUtils.generateToken(claims, userData.getUserId());
 
             var sessionKey = "session:" + req.sessionId();
@@ -199,7 +190,6 @@ public class LoginOtpService {
         } catch (BusinessException e) {
             throw e;
         }  catch (Exception e) {
-            log.info("kenapa ya", e);
             throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UNEXPECTED_ERROR", "Something went wrong while verify OTP", e);
         }
     }
@@ -246,17 +236,17 @@ public class LoginOtpService {
                 );
             }
 
-                var newOtp = OtpGuards.generateNumericOtp();
-                stringRedisTemplate.opsForHash().put(sessionKey, "otp", newOtp);
-                stringRedisTemplate.expire(sessionKey, Duration.ofMinutes(3));
+            var newOtp = OtpGuards.generateNumericOtp();
+            stringRedisTemplate.opsForHash().put(sessionKey, "otp", newOtp);
+            stringRedisTemplate.expire(sessionKey, Duration.ofMinutes(3));
 
-                emailService.sendOtp(email, newOtp);
+            emailService.sendOtp(email, newOtp);
 
-                return new ResendOtpResponse(
-                        true,
-                        "Kode OTP baru telah dikirim ke email Anda. Resend ke-" + resendCount + " dari 3.",
-                        0
-                );
+            return new ResendOtpResponse(
+                    true,
+                    "Kode OTP baru telah dikirim ke email Anda. Resend ke-" + resendCount + " dari 3.",
+                    0
+            );
 
         } catch (BusinessException e) {
             throw e;

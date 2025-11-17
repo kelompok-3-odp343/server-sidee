@@ -21,21 +21,20 @@ public class TrxCategory {
     @Column(nullable = false, updatable = false)
     private String id;
 
-    @Column(nullable = false)
+    @Column(name = "CATEGORY_NAME")
     private String categoryName;
 
-    @Column(nullable = false)
-    private String categoryType;
+    // column CATEGORY_TYPE tidak ada di schema awal, hapus agar sesuai
 
-    @Column(nullable = false)
+    @Column(name = "CREATED_BY", nullable = false)
     private String createdBy;
 
-    @Column(nullable = false)
+    @Column(name = "CREATED_TIME", nullable = false)
     private LocalDateTime createdTime;
 
-    @Column(nullable = false)
+    @Column(name = "UPDATED_BY", nullable = false)
     private String updatedBy;
 
-    @Column(nullable = false)
+    @Column(name = "UPDATED_TIME", nullable = false)
     private LocalDateTime updatedTime;
 }

@@ -1,6 +1,10 @@
 # Gradle
 .gradle/
 build/
+/bin/
+/build/
+/out/
+*.class
 
 # IntelliJ IDEA / JetBrains IDEs
 .idea/

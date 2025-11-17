@@ -1,6 +1,7 @@
 package com.example.wandoor.controller;
 
 import com.example.wandoor.model.request.EditSplitBillRequest;
+import com.example.wandoor.model.request.PatchSplitBillRequest;
 import com.example.wandoor.model.request.SplitBillDetailRequest;
 import com.example.wandoor.model.response.*;
 import com.example.wandoor.service.SplitBillService;
@@ -64,4 +65,11 @@ public class SplitBillController {
         EditSplitBillResponse response = splitBillService.editSplitBill(request);
         return ResponseEntity.ok(response);
     }
+
+    @PatchMapping("/mark-paid")
+    public ResponseEntity<Void> markAsPaid(
+        @Valid @RequestBody PatchSplitBillRequest request){
+            splitBillService.updateHaspaidSplitBill(request);
+            return ResponseEntity.noContent().build();
+        }
 }
