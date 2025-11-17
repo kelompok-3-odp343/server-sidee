@@ -91,7 +91,7 @@ jobs:
           exit-code: '0'  # Staging: '0' (warning only) | Production: '1' (block deploy)
           ignore-unfixed: true  # Skip vuln yang belum ada patch
           vuln-type: 'os,library'  # Scan OS packages & library dependencies
-          severity: 'CRITICAL,HIGH'  # Fokus ke yang paling berbahaya
+          severity: 'LOW,MEDIUM,HIGH,CRITICAL'  # Fokus ke yang paling berbahaya
           timeout: '10m0s'  # Timeout 10 menit
           scanners: 'vuln'  # Hanya scan vulnerability (skip secret/config
 
