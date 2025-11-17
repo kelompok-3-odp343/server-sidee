@@ -113,9 +113,6 @@ public class LoginOtpService {
                 default -> throw new BusinessException(HttpStatus.FORBIDDEN, "ROLE_NOT_ALLOWED", "Role tidak diizinkan login");
             }
 
-
-
-
         } catch (BusinessException e) {
             throw e;
         }  catch (Exception e) {

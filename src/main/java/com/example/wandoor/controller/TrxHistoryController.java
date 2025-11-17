@@ -24,7 +24,7 @@ public class TrxHistoryController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/detail/trx-history")
+    @GetMapping("/trx-history/{transactionId}")
     ResponseEntity<DetailTrxResponse> detailTransactionHistory(
             @PathVariable String transactionId){
         var response = service.fetchTransactionDetail(transactionId);

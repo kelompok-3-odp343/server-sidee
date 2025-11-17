@@ -22,6 +22,8 @@ import com.example.wandoor.repository.TrxHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
+import static java.util.stream.Collectors.toList;
+
 
 @Service
 @Log4j2
@@ -49,7 +51,12 @@ public class TransactionHistoryService {
 
             var targetAccount = accountList.stream()
                     .filter(a -> a.getAccountType().name().equalsIgnoreCase(productType))
-                    .filter(a -> !"SAV".equalsIgnoreCase(productType) || a.getAccountNumber().equals(request.accountNumber()))
+                    .filter(a -> {
+                        if ("SAV".equalsIgnoreCase(productType) || "LFG".equalsIgnoreCase(productType)) {
+                            return a.getAccountNumber().equals(request.accountNumber());
+                        }
+                        return true;
+                    })
                     .toList();
 
             if (targetAccount.isEmpty()) {
@@ -109,15 +116,15 @@ public class TransactionHistoryService {
                     .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "User Not Found"));
 
             //TODO should use trx.categoryId
-            var trxCategpry = trxCategoryRepository.findById(transactionId)
-                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "Category Not Found"));
+//            var trxCategpry = trxCategoryRepository.findById(transactionId)
+//                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "Category Not Found"));
 
             return DetailTrxResponse.builder()
                     .transactionId(trx.getId())
                     .accountNumber(trx.getAccountNumber())
                     .transactionDate(trx.getTransactionDate())
                     .paymentMethod(trx.getPaymentMethod())
-                    .transactionCategory(trxCategpry.getCategoryName())
+//                    .transactionCategory(trxCategpry.getCategoryName())
                     .partyName(trx.getPartyName())
                     .partyDetail(trx.getPartyDetail())
                     .amount(trx.getTransactionAmount())
