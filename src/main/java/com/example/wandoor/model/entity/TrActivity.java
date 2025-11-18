@@ -3,6 +3,7 @@ package com.example.wandoor.model.entity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.Lob;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
@@ -24,6 +25,7 @@ public class TrActivity {
     @Column(nullable = false)
     private String id;
 
+    @Lob
     private Clob metaData;
 
     @Column(nullable = false)

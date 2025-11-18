@@ -98,7 +98,7 @@ public class LoginOtpService {
 
             switch (roleEnum) {
                 case NASABAH -> { return doNasabahLogin(userAuth); }
-                case MAKER, CHECKER, APPROVAL -> {
+                case MAKER, CHECKER, APPROVER -> {
                     var adminProfile = adminProfileRepository.findById(userAuth.getUserId())
                             .orElseThrow(() -> new BusinessException(HttpStatus.CONFLICT, "NO_SUCH_ADMIN", "No Such Admin"));
                     Map<String, Object> claims = new HashMap<>();

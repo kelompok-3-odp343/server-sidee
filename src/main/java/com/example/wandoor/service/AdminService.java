@@ -3,12 +3,15 @@ package com.example.wandoor.service;
 import com.example.wandoor.config.RequestContext;
 import com.example.wandoor.exception.BusinessException;
 import com.example.wandoor.model.entity.AdminProfile;
+import com.example.wandoor.model.entity.RoleManagement;
 import com.example.wandoor.model.entity.TrActivity;
 import com.example.wandoor.model.request.AdminActivityDetailRequest;
+import com.example.wandoor.model.request.AdminApprovalRequest;
 import com.example.wandoor.model.request.AdminBlockUnblockUserRequest;
 import com.example.wandoor.model.response.ActivityDetailResponse;
 import com.example.wandoor.model.response.ActivityListResponse;
 import com.example.wandoor.model.response.AdminActivityCreationResponse;
+import com.example.wandoor.model.response.AdminApprovalResponse;
 import com.example.wandoor.repository.*;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,7 +27,6 @@ import javax.sql.rowset.serial.SerialClob;
 import java.io.BufferedReader;
 import java.io.Reader;
 import java.sql.Clob;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
@@ -44,6 +46,7 @@ public class AdminService {
     private final UserAuthRepository userAuthRepository;
     private final EntityManager entityManager;
     private final ProfileRepository profileRepository;
+    private final AdminMenuRepository adminMenuRepository;
 
     public ActivityListResponse getAllActivityPerAdmin() {
         try {
@@ -387,6 +390,56 @@ public class AdminService {
         }
     }
 
+    @Transactional
+    public AdminApprovalResponse approveActivity(AdminApprovalRequest request) {
+        try {
+            var adminUserId = RequestContext.get().getUserId();
+            // validate user admin
+            var adminProfile = adminProfileRepository.findById(adminUserId)
+                    .orElseThrow(() -> new BusinessException(
+                            HttpStatus.CONFLICT,
+                            "NO_SUCH_ADMIN",
+                            "No Such Admin"
+                    ));
+
+            var roleData = roleManagementRepository.findById(adminProfile.getRoleId())
+                    .orElseThrow(() -> new BusinessException(
+                            HttpStatus.CONFLICT,
+                            "INVALID_ROLE_ID",
+                            "Invalid Role Id from Admin Profile"
+                    ));
+
+            if ("MAKER".equalsIgnoreCase(roleData.getRoleName())) {
+                throw new BusinessException(
+                        HttpStatus.CONFLICT,
+                        "UNAUTHORIZED_AMDMIN_ROLE",
+                        "Only Maker Can Make Activity"
+                );
+            }
+
+            var trActivityData = trActivityRepository.findById(request.getActivityId())
+                    .orElseThrow(() -> new BusinessException(
+                            HttpStatus.CONFLICT,
+                            "INVALID_ACTIVITY_ID",
+                            "Invalid Activity Id"
+                    ));
+
+            return handleApprovalFlow(
+                    request,
+                    adminProfile,
+                    roleData,
+                    trActivityData);
+//            var menuData = adminMenuRepository.findById(trActivityData.getMenuId());
+        } catch (BusinessException e) {
+            throw e;
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Approval error: ", e);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to fetch Admin Activity List");
+        }
+    }
+
     private Clob convertToClob(Object data) {
         try {
             String json = new ObjectMapper().writeValueAsString(data);
@@ -448,6 +501,138 @@ public class AdminService {
         };
     }
 
+    private AdminApprovalResponse handleApprovalFlow(
+            AdminApprovalRequest request,
+            AdminProfile adminProfile,
+            RoleManagement roleData,
+            TrActivity trActivityData
+    ) {
+        String message;
+        if ("PENDING_CHECKER".equalsIgnoreCase(trActivityData.getStatus())) {
+            if ("CHECKER".equalsIgnoreCase(roleData.getRoleName())) {
+                // logic to insert new activity
+                if (request.isApprove()){
+                    var validateApproverData = adminProfileRepository.findById(request.getApproverData().getUserId())
+                                    .orElseThrow(() -> new BusinessException(
+                                            HttpStatus.CONFLICT,
+                                            "INVALID_APPROVER_ID",
+                                            "No such approver found"
+                                    ));
+                    updateActivity(
+                            request.getActivityId(),
+                            "PENDING_APPROVER",
+                            true,
+                            false,
+                            request.isApprove(),
+                            validateApproverData
+                    );
+                    message = "Success Approve Activity By Checker";
+                    return buildApprovalResponse(trActivityData, message);
+
+                } else {
+                    updateActivity(
+                            request.getActivityId(),
+                            "REJECTED",
+                            true,
+                            false,
+                            request.isApprove(),
+                            null
+                    );
+                    message = "Success Reject Activity By Checker";
+                    return buildApprovalResponse(trActivityData, message);
+                }
+            } else {
+                throw new BusinessException(
+                        HttpStatus.CONFLICT,
+                        "INVALID_ROLE_TO_APPROVE",
+                        "Activity Should be Approved by Checker"
+                );
+            }
+        } else if ("PENDING_APPROVER".equalsIgnoreCase(trActivityData.getStatus())) {
+            if ("APPROVER".equalsIgnoreCase(roleData.getRoleName())) {
+                // logic for execute per service
+                return switch (trActivityData.getActionMenu()) {
+                    case "UNBLOCK_USER" -> {
+                        if (request.isApprove()) {
+                            Map<String, Object> metaData = parseClobToMap(trActivityData.getMetaData());
+                            String userId = metaData.get("userId").toString();
+                            userAuthRepository.markUnblockedById(userId);
+                            updateActivity(
+                                    request.getActivityId(),
+                                    "APPROVED",
+                                    false,
+                                    true,
+                                    request.isApprove(),
+                                    null
+
+                            );
+                            yield buildApprovalResponse(trActivityData, "Success Approve Activity By Approver");
+                        } else {
+                            Map<String, Object> metaData = parseClobToMap(trActivityData.getMetaData());
+                            String userId = metaData.get("userId").toString();
+                            updateActivity(
+                                    request.getActivityId(),
+                                    "REJECTED",
+                                    false,
+                                    true,
+                                    request.isApprove(),
+                                    null
+                            );
+                            yield buildApprovalResponse(trActivityData, "Success Approve Activity By Approver");
+
+                        }
+                    }
+                    case "BLOCK_USER" -> {
+                        Map<String, Object> metaData = parseClobToMap(trActivityData.getMetaData());
+                        String userId = metaData.get("userId").toString();
+                        if (request.isApprove()) {
+                            userAuthRepository.markBlockedById(userId);
+                            updateActivity(
+                                    request.getActivityId(),
+                                    "APPROVED",
+                                    false,
+                                    true,
+                                    request.isApprove(),
+                                    null
+                            );
+                            message = "Success Approve Activity By Approver";
+                            yield buildApprovalResponse(trActivityData, message);
+                        } else {
+                            updateActivity(
+                                    request.getActivityId(),
+                                    "REJECTED",
+                                    false,
+                                    true,
+                                    request.isApprove(),
+                                    null
+                            );
+                            message = "Success Approve Activity By Approver";
+                            yield buildApprovalResponse(trActivityData, message);
+                        }
+                    }
+                    default -> throw new BusinessException(
+                            HttpStatus.CONFLICT,
+                            "INVALID_MENU_ACTION",
+                            "Invalid Menu Action"
+                    );
+                };
+            } else {
+                throw new BusinessException(
+                        HttpStatus.CONFLICT,
+                        "INVALID_ROLE_TO_APPROVE",
+                        "Activity Should be Approved by Checker"
+                );
+            }
+        } else {
+            throw new BusinessException(
+                    HttpStatus.CONFLICT,
+                    "NO_NEED_TO_APPROVE",
+                    "Status not showing a need to be approved"
+            );
+        }
+
+    }
+
     private String createActivity(
             AdminBlockUnblockUserRequest request,
             String makerId,
@@ -498,6 +683,41 @@ public class AdminService {
             return newActId;
     };
 
+    @Transactional
+    private void updateActivity(
+        String activityId,
+        String newStatus,
+        boolean updateChecker,
+        boolean updateApprover,
+        boolean isApprove,
+        AdminProfile approverData
+    ) {
+        TrActivity activity = trActivityRepository.findById(activityId)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.CONFLICT,
+                        "INVALID_ACTIVITY_ID",
+                        "Activity not found when updating tr activity table"
+                ));
+
+        activity.setStatus(newStatus);
+
+        if (updateChecker) {
+            activity.setUpdatedTimeChecker(LocalDateTime.now());
+        }
+
+        if (updateApprover) {
+            activity.setUpdatedTimeApprover(LocalDateTime.now());
+        }
+
+        if (updateChecker && isApprove) {
+            activity.setApproverId(approverData.getId());
+        }
+
+        activity.setUpdatedTime(LocalDateTime.now());
+
+        trActivityRepository.save(activity);
+    }
+
     private AdminActivityCreationResponse buildResponse(
             String actId,
             AdminBlockUnblockUserRequest request,
@@ -516,4 +736,23 @@ public class AdminService {
                 .createdTime(time.toString())
                 .build();
     };
+
+    private AdminApprovalResponse buildApprovalResponse(
+            TrActivity trActivityData,
+            String message
+    ) {
+        return AdminApprovalResponse.builder()
+                .menudata(AdminApprovalResponse.MenuData.builder()
+                        .menuId(trActivityData.getMenuId())
+                        .menuAction(trActivityData.getActionMenu())
+                        .actionFlow(trActivityData.getActionFlow())
+                        .menuName(trActivityData.getMenuName())
+                        .build())
+                .updatedTime(trActivityData.getUpdatedTime().toString())
+                .message(message)
+                .build();
+    }
+
+
+
 }
