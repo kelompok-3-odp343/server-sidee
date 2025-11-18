@@ -6,11 +6,12 @@ import lombok.*;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AdminBlockUserRequest {
+public class AdminBlockUnblockUserRequest {
     private UserData userData;
     private String reason;
     private CheckerData checkerData;
     private MenuData menuData;
+    private ApproverData approverData;
 
     @Data
     @Builder
@@ -25,6 +26,16 @@ public class AdminBlockUserRequest {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class CheckerData {
+        private String userId;
+        private String npp;
+        private String fullName;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ApproverData {
         private String userId;
         private String npp;
         private String fullName;
