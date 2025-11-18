@@ -108,17 +108,15 @@ public class LoginOtpService {
 
                     String token = jwtUtils.generateToken(claims, userAuth.getUserId());
                     stringRedisTemplate.opsForValue().set("session:admin:" + userAuth.getUserId(), token, TOKEN_TTL);
-                    return new LoginResponse(true, "Login berhasil sebagai " + roleEnum.name(),  token);
+                    return new LoginResponse(true, "Login berhasil sebagai " + roleEnum.name(), roleEnum.name() , token);
                 }
                 default -> throw new BusinessException(HttpStatus.FORBIDDEN, "ROLE_NOT_ALLOWED", "Role tidak diizinkan login");
             }
 
-
-
-
         } catch (BusinessException e) {
             throw e;
         }  catch (Exception e) {
+            log.info("kenapa ya", e);
             throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UNEXPECTED_ERROR", "Something went wrong while login", e);
         }
 
@@ -402,6 +400,8 @@ public class LoginOtpService {
             stringRedisTemplate.opsForHash().putAll(otpSessionKey, otpData);
             stringRedisTemplate.expire(otpSessionKey, OTP_TTL);
 
+            var role = roleManagementRepository.findById(userAuth.getRoleId())
+                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "ROLE_NOT_FOUND", "Role tidak ditemukan"));
 
             var profile = profileRepository.findById(userAuth.getUserId())
                     .orElseThrow(() -> new BusinessException(HttpStatus.UNAUTHORIZED, "PROFILE_NOT_FOUND", "Profile tidak ditemukan"));
@@ -414,7 +414,7 @@ public class LoginOtpService {
 
             log.info("OTP {} dikirim ke {} | session={} TTL={}m", otp, userAuth.getEmailAddress(), sessionId, OTP_TTL.toMinutes());
 
-            return new LoginResponse(true, "Kode OTP telah dikirim ke email Anda", sessionId);
+            return new LoginResponse(true, "Kode OTP telah dikirim ke email Anda", role.getRoleName() , sessionId);
         } catch (BusinessException e){
             throw e;
         } catch (Exception e) {

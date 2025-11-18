@@ -73,8 +73,8 @@ public class TrxHistory {
     @Column(nullable = false, length = 1)
     private DebitCredit debitCredit;
 
-    //@Column(nullable = false)
-    //private String splitBillId;
+    @Column(nullable = false)
+    private String splitBillId;
 
     //@Builder.Default
     //@Column(nullable = false)

@@ -1,22 +1,21 @@
 package com.example.wandoor.model.response;
 
-import com.example.wandoor.model.enums.DebitCredit;
-import io.soabase.recordbuilder.core.RecordBuilder;
+import lombok.Builder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-@RecordBuilder
-public record TrxResponse(
+@Builder
+public record DetailTrxResponse(
         String transactionId,
         String accountNumber,
         LocalDateTime transactionDate,
         String transactionType,
-        String productSubCategory,
-        String debitCredit,
+        String paymentMethod,       // QRIS / E-Wallet / Transfer / VA
+        String transactionCategory, // Food, Utilities, dll
         String partyName,
         String partyDetail,
         BigDecimal amount,
-        String splitBillId
+        String debitCredit
 ) {
 }
