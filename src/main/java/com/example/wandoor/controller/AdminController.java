@@ -3,6 +3,7 @@ package com.example.wandoor.controller;
 import com.example.wandoor.model.entity.TrActivity;
 import com.example.wandoor.model.request.AdminActivityDetailRequest;
 import com.example.wandoor.model.request.AdminApproverListRequest;
+import com.example.wandoor.model.request.AdminBlockUnblockUserRequest;
 import com.example.wandoor.model.request.DetailUserAdminRequest;
 import com.example.wandoor.model.response.*;
 import com.example.wandoor.service.AdminApproverListService;
@@ -57,6 +58,22 @@ public class AdminController {
             @RequestBody AdminActivityDetailRequest request
             ) {
         ActivityDetailResponse response = adminService.getActivityDetail(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/user/block")
+    public ResponseEntity<AdminActivityCreationResponse> blockUser(
+            @RequestBody AdminBlockUnblockUserRequest request
+            ) {
+        AdminActivityCreationResponse response = adminService.adminBlockUser(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/user/unblock")
+    public ResponseEntity<AdminActivityCreationResponse> unblockUser(
+            @RequestBody AdminBlockUnblockUserRequest request
+    ) {
+        AdminActivityCreationResponse response = adminService.adminUnblockUser(request);
         return ResponseEntity.ok(response);
     }
 }

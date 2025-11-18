@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class AdminActivityCreationResponse {
     private String activityId;
-    private String Message;
+    private String message;
     private MenuData menuData;
     private String createdTime;
 

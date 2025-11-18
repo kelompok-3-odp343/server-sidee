@@ -17,12 +17,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import javax.sql.rowset.serial.SerialClob;
 import java.io.BufferedReader;
 import java.io.Reader;
 import java.sql.Clob;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
@@ -193,7 +195,7 @@ public class AdminService {
                     .createdTime(entity.getCreatedTime() == null ? null : entity.getCreatedTime().toString())
                     .createdBy(entity.getCreatedBy())
                     .build();
-        } catch (ResponseStatusException e) {
+        } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to fetch Admin Activity List");
@@ -226,98 +228,163 @@ public class AdminService {
         }
     }
 
+    @Transactional
     public AdminActivityCreationResponse adminBlockUser(AdminBlockUnblockUserRequest request) {
         try {
-            return AdminActivityCreationResponse.builder().build();
+            var adminUserId = RequestContext.get().getUserId();
+            // validate user admin
+            var adminProfile = adminProfileRepository.findById(adminUserId)
+                    .orElseThrow(() -> new BusinessException(
+                            HttpStatus.CONFLICT,
+                            "NO_SUCH_ADMIN",
+                            "No Such Admin"
+                    ));
 
+            var roleData = roleManagementRepository.findById(adminProfile.getRoleId())
+                    .orElseThrow(() -> new BusinessException(
+                            HttpStatus.CONFLICT,
+                            "INVALID_ROLE_ID",
+                            "Invalid Role Id from Admin Profile"
+                    ));
+
+            System.out.println("roleData" + roleData);
+
+            if ("CHECKER".equalsIgnoreCase(roleData.getRoleName())
+                    || "APPROVER".equalsIgnoreCase(roleData.getRoleName())) {
+                throw new BusinessException(
+                        HttpStatus.CONFLICT,
+                        "UNAUTHORIZED_AMDMIN_ROLE",
+                        "Only Maker Can Make Activity"
+                );
+            }
+
+            // validate user
+            var userProfileData = profileRepository.findById(request.getUserData().getUserId())
+                    .orElseThrow(() -> new BusinessException(
+                            HttpStatus.CONFLICT,
+                            "INVALID_USER_TO_BLOCK",
+                            "User To Block Not Found"
+                    ));
+
+            System.out.println("userPorileData" + userProfileData);
+
+            var userAuthData = userAuthRepository.findByUserId(userProfileData.getId())
+                    .orElseThrow(() -> new BusinessException(
+                            HttpStatus.CONFLICT,
+                            "INVALID_USER_AUTH_DATA",
+                            "Invalid user auth data"
+                    ));
+
+            if (userAuthData.getIsUserBlocked() != null && userAuthData.getIsUserBlocked() == 1) {
+                throw new BusinessException(
+                        HttpStatus.CONFLICT,
+                        "USER_HAS_ALREADY_BEEN_BLOCKED",
+                        "User has already been blocked"
+                );
+            }
+
+            trActivityRepository.findExistingActivity(request.getUserData().getUserId(), request.getMenuData().getMenuId())
+                    .ifPresent(a -> {
+                        throw new BusinessException(
+                                HttpStatus.CONFLICT,
+                                "PENDING_SIMILAR_ACTIVITY",
+                                "Pending Similar Activity"
+                        );
+                    });
+
+            System.out.println("success find latest activity");
+
+            return handleActionFlow(
+                    request,
+                    adminProfile,
+                    () -> userAuthRepository.markBlockedById(userProfileData.getId()),
+                    "Actvitiy created successfully"
+            );
+        } catch (BusinessException e) {
+            throw e;
+        } catch (ResponseStatusException e) {
+            log.error("Critical error during user block process for user: {}", request.getUserData().getUserId(), e);
+            throw e;
+        } catch (Exception e) {
+            log.error("BLOCK USER ERROR: ", e);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to fetch Admin Activity List");
+        }
+    }
+
+    @Transactional
+    public AdminActivityCreationResponse adminUnblockUser(AdminBlockUnblockUserRequest request) {
+        try {
+            var adminUserId = RequestContext.get().getUserId();
+            // validate user admin
+            var adminProfile = adminProfileRepository.findById(adminUserId)
+                    .orElseThrow(() -> new BusinessException(
+                            HttpStatus.CONFLICT,
+                            "NO_SUCH_ADMIN",
+                            "No Such Admin"
+                    ));
+
+            var roleData = roleManagementRepository.findById(adminProfile.getRoleId())
+                    .orElseThrow(() -> new BusinessException(
+                            HttpStatus.CONFLICT,
+                            "INVALID_ROLE_ID",
+                            "Invalid Role Id from Admin Profile"
+                    ));
+
+            if ("CHECKER".equalsIgnoreCase(roleData.getRoleName())
+                    || "APPROVER".equalsIgnoreCase(roleData.getRoleName())) {
+                throw new BusinessException(
+                        HttpStatus.CONFLICT,
+                        "UNAUTHORIZED_AMDMIN_ROLE",
+                        "Only Maker Can Make Activity"
+                );
+            }
+
+            // validate user
+            var userProfileData = profileRepository.findById(request.getUserData().getUserId())
+                    .orElseThrow(() -> new BusinessException(
+                            HttpStatus.CONFLICT,
+                            "INVALID_USER_TO_BLOCK",
+                            "User To Block Not Found"
+                    ));
+
+            var userAuthData = userAuthRepository.findByUserId(userProfileData.getId())
+                    .orElseThrow(() -> new BusinessException(
+                            HttpStatus.CONFLICT,
+                            "INVALID_USER_AUTH_DATA",
+                            "Invalid user auth data"
+                    ));
+
+            if (userAuthData.getIsUserBlocked() != null && userAuthData.getIsUserBlocked() == 0) {
+                throw new BusinessException(
+                        HttpStatus.CONFLICT,
+                        "USER_HAS_ALREADY_BEEN_UNBLOCKED",
+                        "User has already been unblocked"
+                );
+            }
+
+            trActivityRepository.findExistingActivity(request.getUserData().getUserId(), request.getMenuData().getMenuId())
+                    .ifPresent(a -> {
+                        throw new BusinessException(
+                                HttpStatus.CONFLICT,
+                                "PENDING_SIMILAR_ACTIVITY",
+                                "Pending Similar Activity"
+                        );
+                    });
+
+            return handleActionFlow(
+                    request,
+                    adminProfile,
+                    () -> userAuthRepository.markUnblockedById(userProfileData.getId()),
+                    "Actvitiy created successfully"
+            );
+        } catch (BusinessException e) {
+            throw e;
         } catch (ResponseStatusException e) {
             throw e;
         } catch (Exception e) {
+            log.error("UNBBLOCK USER ERROR: ", e);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to fetch Admin Activity List");
         }
-
-        public AdminActivityCreationResponse blockUser(AdminBlockUnblockUserRequest request) {
-            try {
-                var adminUserId = RequestContext.get().getUserId();
-                // validate user admin
-                var adminProfile = adminProfileRepository.findById(adminUserId)
-                        .orElseThrow(() -> new BusinessException(
-                                HttpStatus.CONFLICT,
-                                "NO_SUCH_ADMIN",
-                                "No Such Admin"
-                        ));
-
-                var roleData = roleManagementRepository.findById(adminProfile.getRoleId())
-                        .orElseThrow(() -> new BusinessException(
-                                HttpStatus.CONFLICT,
-                                "INVALID_ROLE_ID",
-                                "Invalid Role Id from Admin Profile"
-                        ));
-
-                if ("CHECKER".equalsIgnoreCase(roleData.getRoleName())
-                || "APPROVER".equalsIgnoreCase(roleData.getRoleName())) {
-                    throw new BusinessException(
-                            HttpStatus.CONFLICT,
-                            "UNAUTHORIZED_AMDMIN_ROLE",
-                            "Only Maker Can Make Activity"
-                    );
-                }
-
-                // validate user
-                var userProfileData = profileRepository.findById(adminUserId)
-                        .orElseThrow(() -> new BusinessException(
-                                HttpStatus.CONFLICT,
-                                "INVALID_USER_TO_BLOCK",
-                                "User To Block Not Found"
-                        ));
-
-                var userAuthData = userAuthRepository.findByUserId(userProfileData.getId())
-                        .orElseThrow(() -> new BusinessException(
-                                HttpStatus.CONFLICT,
-                                "INVALID_USER_AUTH_DATA",
-                                "Invalid user auth data"
-                        ));
-
-                if (userAuthData.getIsUserBlocked() != null && userAuthData.getIsUserBlocked() == 1) {
-                    throw new BusinessException(
-                            HttpStatus.CONFLICT,
-                            "USER_HAS_ALREADY_BEEN_BLOCKED",
-                            "User has already been blocked"
-                    );
-                }
-
-                trActivityRepository.findExistingActivity(request.getUserData().getUserId(), request.getMenuData().getMenuId())
-                        .ifPresent(a -> {
-                            throw new BusinessException(
-                                    HttpStatus.CONFLICT,
-                                    "PENDING_SIMILAR_ACTIVITY",
-                                    "Pending Similar Activity"
-                            );
-                        });
-
-
-
-            } catch (ResponseStatusException e) {
-                throw e;
-            } catch (Exception e) {
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to fetch Admin Activity List");
-            }
-        }
-
-
-    }
-
-    private String generateNextActivityId(){
-        List<String> latestList = trActivityRepository.findLatestActivityIds();
-
-        if (latestList.isEmpty()) {
-            return "ACK00001";
-        }
-        String latest = latestList.get(0);
-        String numberPart = latest.substring(3);
-        int number = Integer.parseInt(numberPart) + 1;
-
-        return "ACK" + String.format("%05d", number);
     }
 
     private Clob convertToClob(Object data) {
@@ -330,18 +397,55 @@ public class AdminService {
     }
 
     private AdminActivityCreationResponse handleActionFlow(
-            AdminBlockUnblockUserRequest request
+            AdminBlockUnblockUserRequest request,
+            AdminProfile adminProfile,
+            Runnable noApprovalOperation,
+            String successMessage
     ) {
 
-        String flow = request.getMenuData().getActionFlow().toUpperCase();
+        String flow = request.getMenuData().getActionFlow() == null ? "" : request.getMenuData().getActionFlow().toUpperCase();
         return switch (flow) {
             case "CHECKER_AND_APPROVER" -> {
                 String actId = createActivity(
                         request,
-                        makerId
-                )
+                        adminProfile.getId(),
+                        "PENDING_CHECKER",
+                        true,
+                        true,
+                        successMessage
+
+                );
+                yield buildResponse(actId, request, LocalDateTime.now(), successMessage);
             }
-        }
+            case "APPROVER_ONLY" -> {
+                String actId = createActivity(
+                        request,
+                        adminProfile.getId(),
+                        "PENDING_APPROVER",
+                        false,
+                        true,
+                        successMessage
+                );
+                yield buildResponse(actId, request, LocalDateTime.now(), successMessage);
+            }
+            case "NO_APPROVER" -> {
+                noApprovalOperation.run();
+                String actId = createActivity(
+                        request,
+                        adminProfile.getId(),
+                        "APPROVED",
+                        false,
+                        true,
+                        successMessage
+                );
+                yield buildResponse(actId, request, LocalDateTime.now(), successMessage);
+            }
+            default -> throw new BusinessException(
+                    HttpStatus.CONFLICT,
+                    "INVALID_ACTION_FLOW",
+                    "Action flow is not supported"
+            );
+        };
     }
 
     private String createActivity(
@@ -349,7 +453,8 @@ public class AdminService {
             String makerId,
             String status,
             boolean includeChecker,
-            boolean includeApprover
+            boolean includeApprover,
+            String successMessage
     ) {
         List<String> list = trActivityRepository.findLatestActivityIds();
         String newActId;
@@ -385,9 +490,30 @@ public class AdminService {
                 .metaData(convertToClob(request.getUserData()))
                 .createdTime(LocalDateTime.now())
                 .createdBy(makerId)
+                .updatedBy(makerId)
+                .updatedTime(LocalDateTime.now())
                 .build();
 
             trActivityRepository.save(activity);
             return newActId;
-    }
+    };
+
+    private AdminActivityCreationResponse buildResponse(
+            String actId,
+            AdminBlockUnblockUserRequest request,
+            LocalDateTime time,
+            String message
+    ) {
+        return AdminActivityCreationResponse.builder()
+                .activityId(actId)
+                .message(message)
+                .menuData(AdminActivityCreationResponse.MenuData.builder()
+                        .menuId(request.getMenuData().getMenuId())
+                        .menuName(request.getMenuData().getMenuName())
+                        .menuAction(request.getMenuData().getMenuAction())
+                        .actionFlow(request.getMenuData().getActionFlow())
+                        .build())
+                .createdTime(time.toString())
+                .build();
+    };
 }
