@@ -47,16 +47,20 @@ public class TransactionHistoryService {
 
             var productType = request.productType().toUpperCase();
 
+            if (("SVG".equalsIgnoreCase(productType) || "LFG".equalsIgnoreCase(productType))
+                    && (request.accountNumber() == null || request.accountNumber().isBlank())) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST",
+                        "Account number is required for this product type");
+            }
 
             var targetAccount = accountList.stream()
                     .filter(a -> a.getAccountType().name().equalsIgnoreCase(productType))
                     .filter(a -> {
-                        if ("SAV".equalsIgnoreCase(productType) || "LFG".equalsIgnoreCase(productType)) {
+                        if ("SVG".equalsIgnoreCase(productType) || "LFG".equalsIgnoreCase(productType)) {
                             return a.getAccountNumber().equals(request.accountNumber());
                         }
                         return true;
                     })
-                    .filter(a -> !"SAV".equalsIgnoreCase(productType) || a.getAccountNumber().equals(request.accountNumber()))
                     .toList();
 
             if (targetAccount.isEmpty()) {
