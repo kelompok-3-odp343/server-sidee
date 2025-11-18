@@ -16,6 +16,7 @@ public record TrxResponse(
         String debitCredit,
         String partyName,
         String partyDetail,
-        BigDecimal amount
+        BigDecimal amount,
+        String splitBillId
 ) {
 }

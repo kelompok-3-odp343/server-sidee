@@ -93,6 +93,7 @@ public class TransactionHistoryService {
                             .partyName(t.getPartyName())
                             .partyDetail(t.getPartyDetail())
                             .amount(t.getTransactionAmount())
+                            .splitBillId(t.getSplitBillId())
                             .build()).toList();
 
             return TransactionHistoryResponseBuilder.builder()
