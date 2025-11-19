@@ -29,56 +29,60 @@ public class TrxSummaryService {
     private final RoleManagementRepository roleManagementRepository;
 
     public TrxSummaryResponse getOverview() {
-        String adminUserId = getAdminUserId();
-        var admin = userAuthRepository.findById(adminUserId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User admin tidak ditemukan"));
+        try {
+            String adminUserId = getAdminUserId();
+            var admin = userAuthRepository.findById(adminUserId)
+                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User admin tidak ditemukan"));
+            var role = roleManagementRepository.findById(admin.getRoleId())
+                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "ROLE_NOT_FOUND", "Role admin tidak ditemukan"));
+            var roleName = role.getRoleName();
+            if (!("MAKER".equalsIgnoreCase(roleName) || "CHECKER".equalsIgnoreCase(roleName) || "APPROVAL".equalsIgnoreCase(roleName))) {
+                throw new BusinessException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Anda bukan admin — akses ditolak");
+            }
 
-        var role = roleManagementRepository.findById(admin.getRoleId())
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "ROLE_NOT_FOUND", "Role admin tidak ditemukan"));
+            double totalSaving = safe(summaryRepository.sumSaving());
+            double totalTimeDeposit = safe(summaryRepository.sumTimeDeposit());
+            double totalLifegoals = safe(summaryRepository.sumLifegoals());
+            double totalPensionFund = safe(summaryRepository.sumPensionFund());
+            double totalAsset = totalSaving + totalTimeDeposit + totalLifegoals + totalPensionFund;
 
-        var roleName = role.getRoleName();
-        if (!("MAKER".equalsIgnoreCase(roleName) || "CHECKER".equalsIgnoreCase(roleName) || "APPROVAL".equalsIgnoreCase(roleName))) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Anda bukan admin — akses ditolak");
+            List<Object[]> catRows = summaryRepository.fetchCategoryTotalsForNasabah();
+            List<TrxSummaryResponse.Category> categories = new ArrayList<>();
+            double grand = catRows.stream().mapToDouble(r -> safe(r, 1)).sum();
+            for (Object[] r : catRows) {
+                TrxSummaryResponse.Category c = new TrxSummaryResponse.Category();
+                c.setCategoryName(str(r, 0));
+                double val = safe(r, 1);
+                c.setTotal(val);
+                c.setPercentage(grand == 0 ? 0 : (int) Math.round((val / grand) * 100));
+                categories.add(c);
+            }
+
+            List<Object[]> userRows = summaryRepository.fetchAllNasabahUsers();
+            List<TrxSummaryResponse.UserItem> users = new ArrayList<>();
+            for (Object[] r : userRows) {
+                TrxSummaryResponse.UserItem u = new TrxSummaryResponse.UserItem();
+                u.setUserid(str(r, 0));
+                u.setCustomerId(str(r, 1));
+                u.setNik(str(r, 2));
+                u.setCustomerName(str(r, 3));
+                users.add(u);
+            }
+
+            TrxSummaryResponse res = new TrxSummaryResponse();
+            res.setTotalSaving(totalSaving);
+            res.setTotalTimeDeposit(totalTimeDeposit);
+            res.setTotalLifegoals(totalLifegoals);
+            res.setTotalPensionFund(totalPensionFund);
+            res.setTotalAsset(totalAsset);
+            res.setCategories(categories);
+            res.setUsers(users);
+            return res;
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UNEXPECTED_ERROR", "Something went wrong while fetching transaction summary", e);
         }
-
-        double totalSaving = safe(summaryRepository.sumSaving());
-        double totalTimeDeposit = safe(summaryRepository.sumTimeDeposit());
-        double totalLifegoals = safe(summaryRepository.sumLifegoals());
-        double totalPensionFund = safe(summaryRepository.sumPensionFund());
-        double totalAsset = totalSaving + totalTimeDeposit + totalLifegoals + totalPensionFund;
-
-        List<Object[]> catRows = summaryRepository.fetchCategoryTotalsForNasabah();
-        List<TrxSummaryResponse.Category> categories = new ArrayList<>();
-        double grand = catRows.stream().mapToDouble(r -> safe(r, 1)).sum();
-        for (Object[] r : catRows) {
-            TrxSummaryResponse.Category c = new TrxSummaryResponse.Category();
-            c.setCategoryName(str(r, 0));
-            double val = safe(r, 1);
-            c.setTotal(val);
-            c.setPercentage(grand == 0 ? 0 : (int) Math.round((val / grand) * 100));
-            categories.add(c);
-        }
-
-        List<Object[]> userRows = summaryRepository.fetchAllNasabahUsers();
-        List<TrxSummaryResponse.UserItem> users = new ArrayList<>();
-        for (Object[] r : userRows) {
-            TrxSummaryResponse.UserItem u = new TrxSummaryResponse.UserItem();
-            u.setUserid(str(r, 0));
-            u.setCustomerId(str(r, 1));
-            u.setNik(str(r, 2));
-            u.setCustomerName(str(r, 3));
-            users.add(u);
-        }
-
-        TrxSummaryResponse res = new TrxSummaryResponse();
-        res.setTotalSaving(totalSaving);
-        res.setTotalTimeDeposit(totalTimeDeposit);
-        res.setTotalLifegoals(totalLifegoals);
-        res.setTotalPensionFund(totalPensionFund);
-        res.setTotalAsset(totalAsset);
-        res.setCategories(categories);
-        res.setUsers(users);
-        return res;
     }
 
     private String getAdminUserId() {

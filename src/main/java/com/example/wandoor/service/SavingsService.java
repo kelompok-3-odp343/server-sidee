@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
 
 import com.example.wandoor.config.RequestContext;
 import com.example.wandoor.model.entity.Account;
@@ -15,6 +16,7 @@ import com.example.wandoor.model.enums.ProductType;
 import com.example.wandoor.model.response.SavingsResponse;
 import com.example.wandoor.repository.AccountRepository;
 import com.example.wandoor.repository.ProfileRepository;
+import com.example.wandoor.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -27,73 +29,77 @@ public class SavingsService {
 
     @Transactional(readOnly = true)
     public SavingsResponse getSavingsForLoggedInUser() {
-        RequestContext ctx = RequestContext.get();
-        String userId = ctx.getUserId();
-        String cif = ctx.getCif();
-
-        if (userId == null || userId.isBlank()) {
-            throw new IllegalStateException("User ID tidak ditemukan (JWT invalid)");
+        try {
+            RequestContext ctx = RequestContext.get();
+            String userId = ctx.getUserId();
+            String cif = ctx.getCif();
+            if (userId == null || userId.isBlank()) {
+                throw new BusinessException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "User ID tidak ditemukan (JWT invalid)");
+            }
+            if (cif == null || cif.isBlank()) {
+                cif = profileRepository.findById(userId)
+                        .map(p -> p.getCif())
+                        .orElse(null);
+            }
+            if (cif == null || cif.isBlank()) {
+                throw new BusinessException(HttpStatus.NOT_FOUND, "CIF_NOT_FOUND", "CIF tidak ditemukan di token maupun profil");
+            }
+            List<Account> savingsAccounts = Optional.ofNullable(accountRepository.findByUserIdAndCif(userId, cif))
+                    .orElse(Collections.emptyList())
+                    .stream()
+                    .filter(acc -> acc.getAccountType() == ProductType.SVG || acc.getAccountType() == ProductType.SAV)
+                    .collect(Collectors.toList());
+            BigDecimal totalEffectiveBalance = savingsAccounts.stream()
+                    .map(a -> a.getEffectiveBalance() == null ? BigDecimal.ZERO : a.getEffectiveBalance())
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            List<SavingsResponse.AccountListItem> accountList = savingsAccounts.stream()
+                    .map(acc -> new SavingsResponse.AccountListItem(
+                            acc.getAccountNumber(),
+                            acc.getAccountHolderName(),
+                            acc.getProductName(),
+                            acc.getEffectiveBalance() == null ? BigDecimal.ZERO : acc.getEffectiveBalance(),
+                            acc.getIsMainAccount() != null && acc.getIsMainAccount() == 1,
+                            acc.getAccountStatus() == null ? null : acc.getAccountStatus().name()
+                    ))
+                    .collect(Collectors.toList());
+            SavingsResponse.TargetAccountDetail target = new SavingsResponse.TargetAccountDetail(totalEffectiveBalance);
+            return new SavingsResponse(target, accountList.isEmpty() ? null : accountList);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UNEXPECTED_ERROR", "Something went wrong while fetching savings", e);
         }
-        if (cif == null || cif.isBlank()) {
-            cif = profileRepository.findById(userId)
-                    .map(p -> p.getCif())
-                    .orElse(null);
-        }
-        if (cif == null || cif.isBlank()) {
-            throw new IllegalStateException("CIF tidak ditemukan di token maupun profil");
-        }
-
-        List<Account> savingsAccounts = Optional.ofNullable(accountRepository.findByUserIdAndCif(userId, cif))
-                .orElse(Collections.emptyList())
-                .stream()
-                .filter(acc -> acc.getAccountType() == ProductType.SVG || acc.getAccountType() == ProductType.SAV)
-                .collect(Collectors.toList());
-
-        BigDecimal totalEffectiveBalance = savingsAccounts.stream()
-                .map(a -> a.getEffectiveBalance() == null ? BigDecimal.ZERO : a.getEffectiveBalance())
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        List<SavingsResponse.AccountListItem> accountList = savingsAccounts.stream()
-                .map(acc -> new SavingsResponse.AccountListItem(
-                        acc.getAccountNumber(),
-                        acc.getAccountHolderName(),
-                        acc.getProductName(),
-                        acc.getEffectiveBalance() == null ? BigDecimal.ZERO : acc.getEffectiveBalance(),
-                        acc.getIsMainAccount() != null && acc.getIsMainAccount() == 1,
-                        acc.getAccountStatus() == null ? null : acc.getAccountStatus().name()
-                ))
-                .collect(Collectors.toList());
-
-        SavingsResponse.TargetAccountDetail target = new SavingsResponse.TargetAccountDetail(totalEffectiveBalance);
-        return new SavingsResponse(target, accountList.isEmpty() ? null : accountList);
     }
 
     @Transactional(readOnly = true)
     public SavingsResponse.AccountListItem getSavingsDetail(String accountNumber) {
-        RequestContext ctx = RequestContext.get();
-        String userId = ctx.getUserId();
-        String cif = ctx.getCif();
-        if (cif == null || cif.isBlank()) {
-            cif = profileRepository.findById(userId).map(p -> p.getCif()).orElse(null);
+        try {
+            RequestContext ctx = RequestContext.get();
+            String userId = ctx.getUserId();
+            String cif = ctx.getCif();
+            if (cif == null || cif.isBlank()) {
+                cif = profileRepository.findById(userId).map(p -> p.getCif()).orElse(null);
+            }
+            Optional<Account> accountOpt = accountRepository.findByUserIdAndCifAndAccountNumber(userId, cif, accountNumber);
+            if (accountOpt.isEmpty()) {
+                throw new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "Account not found or not owned by user");
+            }
+            Account acc = accountOpt.get();
+            if (acc.getAccountType() != ProductType.SVG && acc.getAccountType() != ProductType.SAV) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_ACCOUNT_TYPE", "Account is not a savings account");
+            }
+            return new SavingsResponse.AccountListItem(
+                    acc.getAccountNumber(),
+                    acc.getAccountHolderName(),
+                    acc.getProductName(),
+                    acc.getEffectiveBalance() == null ? BigDecimal.ZERO : acc.getEffectiveBalance(),
+                    acc.getIsMainAccount() != null && acc.getIsMainAccount() == 1,
+                    acc.getAccountStatus() == null ? null : acc.getAccountStatus().name()
+            );
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UNEXPECTED_ERROR", "Something went wrong while fetching savings detail", e);
         }
-
-        Optional<Account> accountOpt = accountRepository.findByUserIdAndCifAndAccountNumber(userId, cif, accountNumber);
-        if (accountOpt.isEmpty()) {
-            throw new IllegalStateException("Account not found or not owned by user");
-        }
-
-        Account acc = accountOpt.get();
-        if (acc.getAccountType() != ProductType.SVG && acc.getAccountType() != ProductType.SAV) {
-            throw new IllegalStateException("Account is not a savings account");
-        }
-
-        return new SavingsResponse.AccountListItem(
-                acc.getAccountNumber(),
-                acc.getAccountHolderName(),
-                acc.getProductName(),
-                acc.getEffectiveBalance() == null ? BigDecimal.ZERO : acc.getEffectiveBalance(),
-                acc.getIsMainAccount() != null && acc.getIsMainAccount() == 1,
-                acc.getAccountStatus() == null ? null : acc.getAccountStatus().name()
-        );
     }
 }
