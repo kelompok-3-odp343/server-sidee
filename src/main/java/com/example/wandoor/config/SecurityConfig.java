@@ -47,6 +47,15 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/api/v1/openapi",
+                                "/api/v1/openapi/**",
+                                "/api/v1/swagger-ui.html",
+                                "/api/v1/swagger-ui/**",
+                                "/swagger-ui/**",
+                                "/swagger-resources/**",
+                                "/webjars/**"
+                        ).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**", "/error").permitAll()
                         .requestMatchers("/api/v1/**").hasRole("NASABAH")
@@ -55,6 +64,19 @@ public class SecurityConfig {
                 )
                 .exceptionHandling(ex -> ex
                         .accessDeniedHandler(accessDeniedHandler())
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+                            response.setContentType("application/json");
+                            response.setCharacterEncoding("UTF-8");
+                            Map<String, Object> body = new HashMap<>();
+                            body.put("status", HttpStatus.UNAUTHORIZED.value());
+                            body.put("errorCode", "UNAUTHORIZED");
+                            body.put("message", "Unauthorized");
+                            body.put("timestamp", Instant.now().toString());
+                            body.put("traceId", MDC.get("traceId"));
+                            body.put("requestId", MDC.get("requestId"));
+                            response.getWriter().write(objectMapper.writeValueAsString(body));
+                        })
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .httpBasic(basic -> basic.disable())
@@ -107,6 +129,13 @@ public class SecurityConfig {
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
         return authenticationConfiguration.getAuthenticationManager();
+    }
+
+    @Bean
+    public org.springframework.boot.web.servlet.FilterRegistrationBean<RequestResponseLoggingFilter> requestResponseLoggingFilterRegistration(RequestResponseLoggingFilter filter) {
+        var reg = new org.springframework.boot.web.servlet.FilterRegistrationBean<RequestResponseLoggingFilter>(filter);
+        reg.setOrder(org.springframework.core.Ordered.HIGHEST_PRECEDENCE);
+        return reg;
     }
 }
 

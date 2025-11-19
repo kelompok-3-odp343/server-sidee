@@ -127,15 +127,18 @@ public class SavingDetailService {
      * Pilih rekening target berdasarkan input user atau akun utama
      */
     private Account selectTargetAccount(SavingDetailRequest request, List<Account> accounts) {
-        return Optional.ofNullable(request)
-                .map(SavingDetailRequest::getAccountNumber)
-                .flatMap(accNum -> accounts.stream()
-                        .filter(a -> a.getAccountNumber().equals(accNum))
-                        .findFirst())
-                .orElseGet(() -> accounts.stream()
-                        .filter(a -> a.getIsMainAccount() != null && a.getIsMainAccount() == 1)
-                        .findFirst()
-                        .orElse(accounts.get(0)));
+        if (request != null && request.getAccountNumber() != null && !request.getAccountNumber().isBlank()) {
+            String accNum = request.getAccountNumber();
+            return accounts.stream()
+                    .filter(a -> a.getAccountNumber().equals(accNum))
+                    .findFirst()
+                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "Account not found"));
+        }
+
+        return accounts.stream()
+                .filter(a -> a.getIsMainAccount() != null && a.getIsMainAccount() == 1)
+                .findFirst()
+                .orElse(accounts.get(0));
     }
 
     /**

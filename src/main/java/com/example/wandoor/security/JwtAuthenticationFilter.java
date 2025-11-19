@@ -29,6 +29,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final RequestContext requestContext;
     private final StringRedisTemplate stringRedisTemplate;
 
+    private boolean isSwagger(String path) {
+        if (path == null) return false;
+        String p = path.toLowerCase();
+        return p.startsWith("/api/v1/openapi")
+                || p.startsWith("/api/v1/swagger-ui")
+                || p.startsWith("/swagger-ui")
+                || p.startsWith("/swagger-resources")
+                || p.startsWith("/webjars");
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest req,
                                     HttpServletResponse response,
@@ -37,14 +47,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String path = req.getRequestURI();
 
-        // Lewati JWT Filter untuk endpoint auth
-        if (path.startsWith("/api/auth/")) {
+        // Lewati JWT Filter untuk swagger dan endpoint auth publik
+        if (isSwagger(path) || path.startsWith("/api/auth/")) {
             filterChain.doFilter(req, response);
             return;
         }
 
         var header = req.getHeader("Authorization");
-        if (header == null || !header.startsWith("Bearer ")){
+        if (header == null || !header.toLowerCase().startsWith("bearer ")){
             unauthorized(response, "Unauthorized - Token JWT tidak valid");
             return;
         }
@@ -94,9 +104,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(req, response);
 
         } catch (Exception e) {
-            log.error("❌ Error di JwtAuthenticationFilter: {}", e.getMessage(), e);
-            SecurityContextHolder.clearContext();
-            unauthorized(response, "Unauthorized - Token JWT tidak valid");
+            if (e instanceof com.auth0.jwt.exceptions.TokenExpiredException) {
+                log.warn("Token expired");
+                SecurityContextHolder.clearContext();
+                unauthorized(response, "Unauthorized - Token expired");
+            } else {
+                log.error("❌ Error di JwtAuthenticationFilter: {}", e.getMessage(), e);
+                SecurityContextHolder.clearContext();
+                unauthorized(response, "Unauthorized - Token JWT tidak valid");
+            }
         } finally {
             MDC.remove("userId");
             MDC.remove("cif");

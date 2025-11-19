@@ -52,8 +52,10 @@ logging:
     org.springframework.security: INFO
     org.springframework.data.redis.core.RedisTemplate: INFO
     io.lettuce.core.protocol: INFO
-    org.springframework.web: DEBUG    #Tambahan untuk Loki
-    org.apache.catalina: DEBUG    #Tambahan untuk Loki
+    org.springframework.web: DEBUG
+    org.apache.catalina: DEBUG
+    org.springdoc: DEBUG
+    io.swagger: DEBUG
 
 # secret & expiry JWT
 app:
@@ -64,17 +66,18 @@ app:
 server:
   port: 8081
   address: 0.0.0.0
+  forward-headers-strategy: native
   error:
     include-message: always
     include-binding-errors: always
     include-stacktrace: never
-  tomcat:     #Tambahan untuk Loki
-    accesslog:    #Tambahan untuk Loki
-      enabled: true    #Tambahan untuk Loki
-      directory: /var/log/springboot    #Tambahan untuk Loki
-      prefix: access_log  #Tambahan untuk Loki
-      suffix: .log    #Tambahan untuk Loki
-      pattern: "%h %l %u %t \"%r\" %s %b"    #Tambahan untuk Loki
+  tomcat:
+    accesslog:
+      enabled: true
+      directory: /var/log/springboot
+      prefix: access_log
+      suffix: .log
+      pattern: "%h %l %u %t \"%r\" %s %b"
 
 management:
   endpoints:
@@ -89,4 +92,16 @@ management:
       application: ${spring.application.name}
   health:
     show-details: always
+
+springdoc:
+  api-docs:
+    path: /api/v1/openapi
+  swagger-ui:
+    path: /api/v1/swagger-ui.html
+    disable-swagger-default-url: true
+    url: /api/v1/openapi
+    
+  packages-to-scan: com.example.wandoor.controller
+  paths-to-match: /api/auth/**, /api/v1/**
+  remove-broken-reference-definitions: true
 

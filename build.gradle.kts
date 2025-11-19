@@ -49,6 +49,8 @@ dependencies {
     implementation("org.flywaydb:flyway-database-oracle:11.7.2")
 
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    // --- Swagger / OpenAPI ---
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0")
 
     compileOnly("io.soabase.record-builder:record-builder-core:47")
     annotationProcessor("io.soabase.record-builder:record-builder-processor:47")
