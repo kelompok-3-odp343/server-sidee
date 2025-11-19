@@ -11,6 +11,7 @@ public class RequestContext {
     private String userId;
     private String cif;
     private String npp;
+    private String token;
 
     public static RequestContext get() {
         return CONTEXT.get();

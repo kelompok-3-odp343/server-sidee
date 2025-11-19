@@ -36,9 +36,8 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<LogoutResponse> logout (
-            @RequestHeader("Authorization") String auth
     ){
-        String token = auth.replace("Bearer ", "");
+        String token = RequestContext.get().getToken();
         String userId = RequestContext.get().getUserId();
 
         return ResponseEntity.ok(loginOtpService.logout(token, userId));

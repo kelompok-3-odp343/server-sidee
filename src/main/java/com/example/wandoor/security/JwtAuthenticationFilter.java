@@ -38,7 +38,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String path = req.getRequestURI();
 
         // Lewati JWT Filter untuk endpoint auth
-        if (path.startsWith("/api/auth/")) {
+        if (path.equals("/api/auth/login") ||
+                path.equals("/api/auth/resend-otp") ||
+                path.equals("/api/auth/verify-otp") ||
+                path.equals("/api/auth/forgot-password/request-otp") ||
+                path.equals("/api/auth/forgot-password/verify-otp"))
+        {
+
             filterChain.doFilter(req, response);
             return;
         }
@@ -88,6 +94,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             ctx.setUserId(userId);
             ctx.setCif(cif);
             ctx.setNpp(npp);
+            ctx.setToken(token);
 
             log.info("🔐 Authenticated user={} role={} cif={}", userId, role, cif != null ? cif : "-");
 
