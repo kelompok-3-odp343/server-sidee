@@ -50,7 +50,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**", "/error").permitAll()
                         .requestMatchers("/api/v1/**").hasRole("NASABAH")
-                        .requestMatchers("/api/admin/**").hasAnyRole("MAKER", "CHECKER", "APPROVAL")
+                        .requestMatchers("/api/admin/**").hasAnyRole("MAKER", "CHECKER", "APPROVER")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
