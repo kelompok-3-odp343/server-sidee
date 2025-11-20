@@ -128,6 +128,8 @@ public class SplitBillService {
                 log.info("Successfully fetched {} split bills in {} ms (traceId={})",
                         responseList.size(), duration, traceId);
                 return new SplitBillsListResponse(responseList);         
+        } catch (BusinessException e) {
+            throw e;
         } catch (ResponseStatusException e) {
                 log.warn("Business error while fetching split bills: {}", e.getMessage());
                 throw e;
@@ -218,157 +220,178 @@ public class SplitBillService {
 
     @Transactional
     public AddNewSplitBillResponse createSplitBill(AddNewSplitBillRequest request) {
-        //        System.out.println("Hai Aku dari Service");
-        log.info("Receive create split bill request dari service: {}", request.splitBillTitle());
-        var userId = RequestContext.get().getUserId();
-        var cif = RequestContext.get().getCif();
+        try {
+            log.info("Receive create split bill request dari service: {}", request.splitBillTitle());
+            var userId = RequestContext.get().getUserId();
+            var cif = RequestContext.get().getCif();
 
-        var userData = profileRepository.findByIdAndCif(userId, cif)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "User not found"));
+            var userData = profileRepository.findByIdAndCif(userId, cif)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "User not found"));
 
-        var account = accountRepository.findByUserIdAndCifAndAccountNumber(userId, cif, request.accountNumber())
-                .orElseThrow(()-> new ResponseStatusException(HttpStatus.CONFLICT, "No Such Account"));
+            var account = accountRepository.findByUserIdAndCifAndAccountNumber(userId, cif, request.accountNumber())
+                    .orElseThrow(()-> new ResponseStatusException(HttpStatus.CONFLICT, "No Such Account"));
 
 
-        var trx = trxHistoryRepository
-                .findByIdAndAccountNumber(request.transactionId(), account.getAccountNumber())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Invalid Transaction Id"));
+            var trx = trxHistoryRepository
+                    .findByIdAndAccountNumber(request.transactionId(), account.getAccountNumber())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Invalid Transaction Id"));
 
-        BigDecimal totalMemberAmount = request.billMembers().stream()
-                .map(AddNewSplitBillRequest.BillMembers::amountShare)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal totalMemberAmount = request.billMembers().stream()
+                    .map(AddNewSplitBillRequest.BillMembers::amountShare)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        if (trx.getTransactionAmount().compareTo(totalMemberAmount) != 0) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Invalid Total Amount");
+            if (trx.getTransactionAmount().compareTo(totalMemberAmount) != 0) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Invalid Total Amount");
+            }
+
+            //insert ke table split bill
+            SplitBill splitBill = SplitBill.builder()
+                    .userId(userId)
+                    .cif(cif)
+                    .accountNumber(account.getAccountNumber())
+                    .transactionId(trx.getId())
+                    .splitBillTitle(request.splitBillTitle())
+                    .currency(request.currency())
+                    .totalAmount(trx.getTransactionAmount())
+                    .isDeleted(0)
+                    .createdBy("SYSTEM")
+                    .createdTime(LocalDateTime.now())
+                    .updatedBy("SYSTEM")
+                    .updatedTime(LocalDateTime.now())
+                    .build();
+
+            var savedSplitBill = splitBillRepository.save(splitBill);
+
+            List<SplitBillMember> members = request.billMembers().stream()
+                    .map(m -> SplitBillMember.builder()
+                            .splitBill(savedSplitBill)
+                            .userId(userData.getId())
+                            .memberName(m.memberName())
+                            .amountShare(m.amountShare())
+                            .hasPaid(0)
+                            .isDeleted(0)
+                            .createdBy("SYSTEM")
+                            .createdTime(LocalDateTime.now())
+                            .updatedBy("SYSTEM")
+                            .updatedTime(LocalDateTime.now())
+                            .build())
+                    .toList();
+
+            splitBillMemberRepository.saveAll(members);
+
+            log.info("Split bill created successfully with ID={}", splitBill.getId());
+
+            return new AddNewSplitBillResponse(
+                    "Split bill created successfully",
+                    splitBill.getId()
+            );
+
+        } catch (BusinessException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            log.error("Add new split bill error: ", e);
+            throw e;
+        } catch (Exception e) {
+            log.error("Add new split bill error: ", e);
+            throw e;
         }
-
-        //insert ke table split bill
-        SplitBill splitBill = SplitBill.builder()
-                .userId(userId)
-                .cif(cif)
-                .accountNumber(account.getAccountNumber())
-                .transactionId(trx.getId())
-                .splitBillTitle(request.splitBillTitle())
-                .currency(request.currency())
-                .totalAmount(trx.getTransactionAmount())
-                .isDeleted(0)
-                .createdBy("SYSTEM")
-                .createdTime(LocalDateTime.now())
-                .updatedBy("SYSTEM")
-                .updatedTime(LocalDateTime.now())
-                .build();
-
-        var savedSplitBill = splitBillRepository.save(splitBill);
-
-        List<SplitBillMember> members = request.billMembers().stream()
-                .map(m -> SplitBillMember.builder()
-                        .splitBill(savedSplitBill)
-                        .userId(userData.getId())
-                        .memberName(m.memberName())
-                        .amountShare(m.amountShare())
-                        .hasPaid(0)
-                        .isDeleted(0)
-                        .createdBy("SYSTEM")
-                        .createdTime(LocalDateTime.now())
-                        .updatedBy("SYSTEM")
-                        .updatedTime(LocalDateTime.now())
-                        .build())
-                .toList();
-
-        splitBillMemberRepository.saveAll(members);
-
-        log.info("Split bill created successfully with ID={}", splitBill.getId());
-
-        return new AddNewSplitBillResponse(
-                "Split bill created successfully",
-                splitBill.getId()
-        );
     }
 
     @Transactional
     public EditSplitBillResponse editSplitBill(EditSplitBillRequest request) {
+        try {
+            var cif = RequestContext.get().getCif();
+            var userId = RequestContext.get().getUserId();
 
-        var cif = RequestContext.get().getCif();
-        var userId = RequestContext.get().getUserId();
+            var userData = profileRepository.findByIdAndCif(userId, cif)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "User Not Found"));
 
-        var userData = profileRepository.findByIdAndCif(userId, cif)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "User Not Found"));
+            var trxHistoryData = trxHistoryRepository.findById(request.transactionId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Invalid Transaction Id"));
 
-        var trxHistoryData = trxHistoryRepository.findById(request.transactionId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Invalid Transaction Id"));
+            var splitBill = splitBillRepository.findByIdAndUserIdAndCifAndTransactionId(
+                            request.splitBillId(),
+                            userData.getId(),
+                            userData.getCif(),
+                            trxHistoryData.getId()
+                    )
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Split Bill Data Not Found"));
 
-        var splitBill = splitBillRepository.findByIdAndUserIdAndCifAndTransactionId(
-                        request.splitBillId(),
-                        userData.getId(),
-                        userData.getCif(),
-                        trxHistoryData.getId()
-                )
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Split Bill Data Not Found"));
+            splitBill.setSplitBillTitle(request.splitBillTitle());
+            splitBill.setTotalAmount(request.totalAmount());
+            splitBill.setUpdatedTime(LocalDateTime.now());
+            splitBill.setUpdatedBy(userId);
+            splitBillRepository.save(splitBill);
 
-        splitBill.setSplitBillTitle(request.splitBillTitle());
-        splitBill.setTotalAmount(request.totalAmount());
-        splitBill.setUpdatedTime(LocalDateTime.now());
-        splitBill.setUpdatedBy(userId);
-        splitBillRepository.save(splitBill);
+            var existingMembers = splitBillMemberRepository.findAllBySplitBillId(splitBill.getId());
+            Map<String, SplitBillMember> existingMap = existingMembers.stream()
+                    .collect(Collectors.toMap(SplitBillMember::getId, Function.identity()));
 
-        var existingMembers = splitBillMemberRepository.findAllBySplitBillId(splitBill.getId());
-        Map<String, SplitBillMember> existingMap = existingMembers.stream()
-                .collect(Collectors.toMap(SplitBillMember::getId, Function.identity()));
+            Set<String> requestExistingIds = request.billMembers().stream()
+                    .map(EditSplitBillRequest.BillMembers::memberId)
+                    .filter(id -> id != null && !id.isBlank())
+                    .collect(Collectors.toSet());
 
-        Set<String> requestExistingIds = request.billMembers().stream()
-                .map(EditSplitBillRequest.BillMembers::memberId)
-                .filter(id -> id != null && !id.isBlank())
-                .collect(Collectors.toSet());
+            for (var m : request.billMembers()) {
 
-        for (var m : request.billMembers()) {
+                    if (m.memberId() != null && existingMap.containsKey(m.memberId())) {
+                    var existing = existingMap.get(m.memberId());
 
-                if (m.memberId() != null && existingMap.containsKey(m.memberId())) {
-                var existing = existingMap.get(m.memberId());
+                    existing.setMemberName(m.memberName());
+                    existing.setAmountShare(m.amountShare());
+                    existing.setHasPaid(Boolean.TRUE.equals(m.hasPaid()) ? 1 : 0);
+                    existing.setUpdatedTime(LocalDateTime.now());
+                    existing.setUpdatedBy(userId);
 
-                existing.setMemberName(m.memberName());
-                existing.setAmountShare(m.amountShare());
-                existing.setHasPaid(Boolean.TRUE.equals(m.hasPaid()) ? 1 : 0);
-                existing.setUpdatedTime(LocalDateTime.now());
-                existing.setUpdatedBy(userId);
+                    splitBillMemberRepository.save(existing);
+                    }
+            }
 
-                splitBillMemberRepository.save(existing);
-                }
+            for (var e : existingMembers) {
+                    if (!requestExistingIds.contains(e.getId())) {
+                    splitBillMemberRepository.deleteById(e.getId());
+                    }
+            }
+
+            for (var m : request.billMembers()) {
+
+                    boolean exists = m.memberId() != null && existingMap.containsKey(m.memberId());
+
+                    if (!exists) {
+                    var entity = new SplitBillMember();
+                    entity.setId(UUID.randomUUID().toString());
+                    entity.setSplitBill(splitBill);
+                    entity.setUserId(userId);
+                    entity.setCreatedBy(userId);
+                    entity.setUpdatedBy(userId);
+
+                    entity.setMemberName(m.memberName());
+                    entity.setAmountShare(m.amountShare());
+                    entity.setHasPaid(Boolean.TRUE.equals(m.hasPaid()) ? 1 : 0);
+
+                    entity.setCreatedTime(LocalDateTime.now());
+                    entity.setUpdatedTime(LocalDateTime.now());
+
+                    splitBillMemberRepository.save(entity);
+                    }
+            }
+
+            return new EditSplitBillResponse(
+                    "Split bill updated successfully",
+                    splitBill.getId()
+            );
+
+        } catch (BusinessException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            log.error("Edit split bill error", e);
+            throw e;
+        } catch (Exception e) {
+            log.error("Edit split bill error", e);
+            throw e;
         }
 
-        for (var e : existingMembers) {
-                if (!requestExistingIds.contains(e.getId())) {
-                splitBillMemberRepository.deleteById(e.getId());
-                }
-        }
-
-        for (var m : request.billMembers()) {
-
-                boolean exists = m.memberId() != null && existingMap.containsKey(m.memberId());
-
-                if (!exists) {
-                var entity = new SplitBillMember();
-                entity.setId(UUID.randomUUID().toString());
-                entity.setSplitBill(splitBill);
-                entity.setUserId(userId);
-                entity.setCreatedBy(userId);
-                entity.setUpdatedBy(userId);
-
-                entity.setMemberName(m.memberName());
-                entity.setAmountShare(m.amountShare());
-                entity.setHasPaid(Boolean.TRUE.equals(m.hasPaid()) ? 1 : 0);
-
-                entity.setCreatedTime(LocalDateTime.now());
-                entity.setUpdatedTime(LocalDateTime.now());
-
-                splitBillMemberRepository.save(entity);
-                }
-        }
-
-        return new EditSplitBillResponse(
-                "Split bill updated successfully",
-                splitBill.getId()
-        );
     }
 
     @Transactional
