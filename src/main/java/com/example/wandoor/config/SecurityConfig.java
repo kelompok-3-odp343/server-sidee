@@ -1,15 +1,13 @@
 package com.example.wandoor.config;
 
-import com.example.wandoor.security.JwtAuthenticationFilter;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
-import org.apache.catalina.filters.CorsFilter;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.slf4j.MDC;
-import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.EnableMBeanExport;
-import org.springframework.core.Ordered;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -25,11 +23,10 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.time.Instant;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import com.example.wandoor.security.JwtAuthenticationFilter;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import lombok.RequiredArgsConstructor;
 
 @Configuration
 @EnableWebSecurity
@@ -73,7 +70,9 @@ public class SecurityConfig {
                 "http://34.87.139.149:30081",
                 "http://34.87.139.149:30080",
                 "https://app.wandoor.my.id",
-                "https://api.wandoor.my.id"
+                "https://api.wandoor.my.id",
+                "http://34.143.146.191:30080",
+                "http://34.143.146.191:30081"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
