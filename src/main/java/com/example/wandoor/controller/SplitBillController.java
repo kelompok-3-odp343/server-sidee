@@ -2,6 +2,7 @@ package com.example.wandoor.controller;
 
 import java.net.URI;
 
+import com.example.wandoor.model.response.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -15,10 +16,6 @@ import com.example.wandoor.model.request.AddNewSplitBillRequest;
 import com.example.wandoor.model.request.EditSplitBillRequest;
 import com.example.wandoor.model.request.PatchSplitBillRequest;
 import com.example.wandoor.model.request.SplitBillDetailRequest;
-import com.example.wandoor.model.response.AddNewSplitBillResponse;
-import com.example.wandoor.model.response.EditSplitBillResponse;
-import com.example.wandoor.model.response.SplitBillDetailResponse;
-import com.example.wandoor.model.response.SplitBillsListResponse;
 import com.example.wandoor.service.SplitBillService;
 
 import jakarta.validation.Valid;
@@ -69,9 +66,9 @@ public class SplitBillController {
     }
 
     @PatchMapping("/mark-paid")
-    public ResponseEntity<Void> markAsPaid(
+    public ResponseEntity<MarkAsPaidSplitBillResponse> markAsPaid(
         @Valid @RequestBody PatchSplitBillRequest request){
-            splitBillService.updateHaspaidSplitBill(request);
-            return ResponseEntity.noContent().build();
+            MarkAsPaidSplitBillResponse response = splitBillService.updateHaspaidSplitBill(request);
+            return ResponseEntity.ok(response);
         }
 }
