@@ -3,10 +3,7 @@ package com.example.wandoor.controller;
 import com.example.wandoor.model.entity.TrActivity;
 import com.example.wandoor.model.request.*;
 import com.example.wandoor.model.response.*;
-import com.example.wandoor.service.AdminApproverListService;
-import com.example.wandoor.service.AdminMenuAccessService;
-import com.example.wandoor.service.AdminService;
-import com.example.wandoor.service.DetailUserAdminService;
+import com.example.wandoor.service.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,17 +20,23 @@ public class AdminController {
     private final AdminMenuAccessService adminMenuAccessService;
     private final AdminApproverListService adminApproverListService;
     private final AdminService adminService;
+    private final AdminTransactionListService adminTransactionListService;
 
     @PostMapping("/detail-user")
     public ResponseEntity<DetailUserAdminResponse> getDetail(@RequestBody DetailUserAdminRequest request) {
         DetailUserAdminResponse response = detailUserAdminService.getUserDetail(request);
         return ResponseEntity.ok(response);
-    }
+   }
 
     @GetMapping("/menu-access")
     public ResponseEntity<Map<String, Map<String, String>>> getMenu(){
         Map<String, Map<String, String>> response = adminMenuAccessService.getMenuStructure();
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/transaction/list")
+    public ResponseEntity<AdminTransactionListResponse> list(@RequestBody AdminTransactionListRequest request){
+        return ResponseEntity.ok(adminTransactionListService.getTransactionList(request));
     }
 
     @PostMapping("/approver-list")
