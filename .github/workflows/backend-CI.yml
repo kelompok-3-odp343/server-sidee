@@ -83,7 +83,7 @@ jobs:
 
       - name: Update image tag in backend deployment
         run: |
-          cd infra/k3s-manifests/v2/backend-wandoor
+          cd infra/v2/k3s-manifests/backend-wandoor
           sed -i "s|jrtr1/wandoor-backend-app:.*|jrtr1/wandoor-backend-app:backend-${{ github.sha }}|g" backend-deployment.yaml
 
       - name: Commit and push updated image tag to main branch
