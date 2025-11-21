@@ -32,18 +32,19 @@ public interface SplitBillMemberRepository extends JpaRepository<SplitBillMember
     @Query("""
         UPDATE SplitBillMember sbm
         SET hasPaid = 1,
-        updatedTime = CURRENT_TIMESTAMP
-        WHERE sbm.splitBill.id =: splitBillId
-        AND sbm.id =: memberId
+        updatedTime = CURRENT_TIMESTAMP,
+        paymentDate = CURRENT_TIMESTAMP
+        WHERE sbm.splitBill.id = :splitBillId
+        AND sbm.id = :memberId
     """)
     int markAsPaid (@Param("splitBillId") String splitBillId, @Param("memberId") String memberId);
 
     @Query("""
             SELECT sbm
             FROM SplitBillMember sbm
-            WHERE sbm.splitBill.id =: splitBillId
-            AND sbm.id =: memberId
-            AND hasPaid = 0
+            WHERE sbm.splitBill.id =:splitBillId
+            AND sbm.id = :memberId
+            AND sbm.hasPaid = 0
             """)
     Optional<SplitBillMember> findUnpaidSplitBillMemberById (@Param("splitBillId") String splitBillId, @Param("memberId") String memberId);
 }

@@ -11,6 +11,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.example.wandoor.model.response.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -27,10 +28,6 @@ import com.example.wandoor.model.request.AddNewSplitBillRequest;
 import com.example.wandoor.model.request.EditSplitBillRequest;
 import com.example.wandoor.model.request.PatchSplitBillRequest;
 import com.example.wandoor.model.request.SplitBillDetailRequest;
-import com.example.wandoor.model.response.AddNewSplitBillResponse;
-import com.example.wandoor.model.response.EditSplitBillResponse;
-import com.example.wandoor.model.response.SplitBillDetailResponse;
-import com.example.wandoor.model.response.SplitBillsListResponse;
 import com.example.wandoor.repository.AccountRepository;
 import com.example.wandoor.repository.ProfileRepository;
 import com.example.wandoor.repository.SplitBillMemberRepository;
@@ -190,6 +187,7 @@ public class SplitBillService {
                                     SplitBillDetailResponse.Data data = new SplitBillDetailResponse.Data(
                                             splitBIllData.getId(),
                                             splitBIllData.getSplitBillTitle(),
+                                            splitBIllData.getAccountNumber(),
                                             splitBIllData.getCurrency(),
                                             transactionData.getRefId(),
                                             splitBIllData.getCreatedTime().toString(),
@@ -241,7 +239,8 @@ public class SplitBillService {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             if (trx.getTransactionAmount().compareTo(totalMemberAmount) != 0) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                throw new BusinessException(HttpStatus.CONFLICT,
+                        "INVALID_TOTAL_AMOUNT",
                         "Invalid Total Amount");
             }
 
@@ -309,6 +308,16 @@ public class SplitBillService {
 
             var trxHistoryData = trxHistoryRepository.findById(request.transactionId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Invalid Transaction Id"));
+
+            BigDecimal totalMemberAmount = request.billMembers().stream()
+                    .map(EditSplitBillRequest.BillMembers::amountShare)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            if (trxHistoryData.getTransactionAmount().compareTo(totalMemberAmount) != 0) {
+                throw new BusinessException(HttpStatus.CONFLICT,
+                        "INVALID_TOTAL_AMOUNT",
+                        "Invalid Total Amount");
+            }
 
             var splitBill = splitBillRepository.findByIdAndUserIdAndCifAndTransactionId(
                             request.splitBillId(),
@@ -395,8 +404,7 @@ public class SplitBillService {
     }
 
     @Transactional
-    public void updateHaspaidSplitBill(PatchSplitBillRequest request) {
-            
+    public MarkAsPaidSplitBillResponse updateHaspaidSplitBill(PatchSplitBillRequest request) {
             try {
                 var userId = RequestContext.get().getUserId();
                 var cif = RequestContext.get().getCif();
@@ -423,7 +431,12 @@ public class SplitBillService {
                 if (updated == 0) {
                         log.warn("Member update failed for splitBillId={} and memberId={}", request.splitBillId(), request.memberId());
                         throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UPDATE_FAILED", "Failed to mark as paid");
-                        }        
+                        }
+                return new MarkAsPaidSplitBillResponse(
+                        "Successfully update member to paid",
+                        request.splitBillId(),
+                        request.memberId()
+                );
                 } catch (ResponseStatusException e) {
                         throw e;
                         
