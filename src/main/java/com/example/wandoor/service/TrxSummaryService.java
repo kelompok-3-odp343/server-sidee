@@ -13,6 +13,7 @@ import com.example.wandoor.config.RequestContext;
 import com.example.wandoor.exception.BusinessException;
 import com.example.wandoor.model.response.TrxSummaryResponse;
 import com.example.wandoor.repository.RoleManagementRepository;
+import com.example.wandoor.repository.ProfileRepository;
 import com.example.wandoor.repository.TrxSummaryRepository;
 import com.example.wandoor.repository.UserAuthRepository;
 
@@ -27,6 +28,7 @@ public class TrxSummaryService {
     private final TrxSummaryRepository summaryRepository;
     private final UserAuthRepository userAuthRepository;
     private final RoleManagementRepository roleManagementRepository;
+    private final ProfileRepository profileRepository;
 
     public TrxSummaryResponse getOverview() {
         try {
@@ -46,26 +48,31 @@ public class TrxSummaryService {
             double totalPensionFund = safe(summaryRepository.sumPensionFund());
             double totalAsset = totalSaving + totalTimeDeposit + totalLifegoals + totalPensionFund;
 
-            List<Object[]> catRows = summaryRepository.fetchCategoryTotalsForNasabah();
+            List<String> catNames = summaryRepository.fetchAllCategoryNamesForNasabah();
             List<TrxSummaryResponse.Category> categories = new ArrayList<>();
-            double grand = catRows.stream().mapToDouble(r -> safe(r, 1)).sum();
-            for (Object[] r : catRows) {
+            double grand = safe(summaryRepository.sumAllTransactionAmountForNasabah());
+            int limit = Math.min(3, catNames.size());
+            for (int i = 0; i < limit; i++) {
+                String name = catNames.get(i);
+                double val = safe(summaryRepository.sumCategoryAmountForNasabah(name));
                 TrxSummaryResponse.Category c = new TrxSummaryResponse.Category();
-                c.setCategoryName(str(r, 0));
-                double val = safe(r, 1);
+                c.setCategoryName(name);
                 c.setTotal(val);
                 c.setPercentage(grand == 0 ? 0 : (int) Math.round((val / grand) * 100));
                 categories.add(c);
             }
 
-            List<Object[]> userRows = summaryRepository.fetchAllNasabahUsers();
+            List<String> userIds = summaryRepository.fetchAllNasabahUserIds();
             List<TrxSummaryResponse.UserItem> users = new ArrayList<>();
-            for (Object[] r : userRows) {
+            for (String uid : userIds) {
+                var p = profileRepository.findById(uid).orElse(null);
                 TrxSummaryResponse.UserItem u = new TrxSummaryResponse.UserItem();
-                u.setUserid(str(r, 0));
-                u.setCustomerId(str(r, 1));
-                u.setNik(str(r, 2));
-                u.setCustomerName(str(r, 3));
+                u.setUserid(uid);
+                u.setCustomerId(p != null ? p.getCif() : "");
+                u.setNik(p != null ? p.getNik() : "");
+                String mid = p != null && p.getMiddleName() != null ? p.getMiddleName() : "";
+                String name = p != null ? (p.getFirstName() + " " + mid + " " + p.getLastName()) : "";
+                u.setCustomerName(name);
                 users.add(u);
             }
 
@@ -95,15 +102,5 @@ public class TrxSummaryService {
 
     private double safe(Double d) {
         return d == null ? 0.0 : d;
-    }
-
-    private double safe(Object[] arr, int idx) {
-        if (arr == null || arr.length <= idx || arr[idx] == null) return 0.0;
-        try { return Double.parseDouble(arr[idx].toString()); } catch (Exception e) { return 0.0; }
-    }
-
-    private String str(Object[] arr, int idx) {
-        if (arr == null || arr.length <= idx || arr[idx] == null) return "";
-        return arr[idx].toString();
     }
 }
