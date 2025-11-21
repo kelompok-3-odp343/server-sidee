@@ -3,7 +3,7 @@
 
     <!-- Tentukan lokasi log -->
 <!--    <property name="LOG_PATH" value="/logs/springboot" />-->
-    <property name="LOG_FILE" value="${LOG_PATH}/app.log" />
+<!--    <property name="LOG_FILE" value="${LOG_PATH}/app.log" />-->
 
     <!-- Console Appender (JSON format) -->
     <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
@@ -29,32 +29,32 @@
     </appender>
 
     <!-- File Appender (JSON format) -->
-    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${LOG_FILE}</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_PATH}/app-%d{yyyy-MM-dd}.log</fileNamePattern>
-            <maxHistory>7</maxHistory>
-        </rollingPolicy>
-        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
-            <providers>
-                <timestamp>
-                    <timeZone>Asia/Jakarta</timeZone>
-                </timestamp>
-                <mdc />
-                <pattern>
-                    <pattern>
-                        {
-                        "level": "%level",
-                        "logger": "%logger{36}",
-                        "message": "%message",
-                        "thread": "%thread",
-                        "stack_trace": "%ex{full}"
-                        }
-                    </pattern>
-                </pattern>
-            </providers>
-        </encoder>
-    </appender>
+<!--    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">-->
+<!--        <file>${LOG_FILE}</file>-->
+<!--        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">-->
+<!--            <fileNamePattern>${LOG_PATH}/app-%d{yyyy-MM-dd}.log</fileNamePattern>-->
+<!--            <maxHistory>7</maxHistory>-->
+<!--        </rollingPolicy>-->
+<!--        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">-->
+<!--            <providers>-->
+<!--                <timestamp>-->
+<!--                    <timeZone>Asia/Jakarta</timeZone>-->
+<!--                </timestamp>-->
+<!--                <mdc />-->
+<!--                <pattern>-->
+<!--                    <pattern>-->
+<!--                        {-->
+<!--                        "level": "%level",-->
+<!--                        "logger": "%logger{36}",-->
+<!--                        "message": "%message",-->
+<!--                        "thread": "%thread",-->
+<!--                        "stack_trace": "%ex{full}"-->
+<!--                        }-->
+<!--                    </pattern>-->
+<!--                </pattern>-->
+<!--            </providers>-->
+<!--        </encoder>-->
+<!--    </appender>-->
 
     <!-- Root Logger -->
     <root level="INFO">

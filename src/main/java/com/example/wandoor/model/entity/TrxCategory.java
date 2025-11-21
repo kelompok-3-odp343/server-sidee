@@ -24,8 +24,6 @@ public class TrxCategory {
     @Column(name = "CATEGORY_NAME")
     private String categoryName;
 
-    // column CATEGORY_TYPE tidak ada di schema awal, hapus agar sesuai
-
     @Column(name = "CREATED_BY", nullable = false)
     private String createdBy;
 

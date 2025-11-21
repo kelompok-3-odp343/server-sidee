@@ -91,9 +91,9 @@ public class DplkService {
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "INVALID_USER", "User not found"));
 
         var getDplkAccount = dplkAccountRepository.findAllByUserIdAndCif(userId, cif);
-        if (getDplkAccount.isEmpty()){
-            throw new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "No DPLK accounts found");
-        }
+//        if (getDplkAccount.isEmpty()){
+//            throw new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "No DPLK accounts found");
+//        }
 
         return getDplkAccount.stream().map(
                 acc -> {
