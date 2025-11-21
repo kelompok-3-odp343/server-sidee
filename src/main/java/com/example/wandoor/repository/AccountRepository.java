@@ -32,4 +32,6 @@ public interface AccountRepository extends JpaRepository<Account, String> {
 
     List<Account> findByUserIdAndCifAndAccountType(String userId, String cif, ProductType productType);
 
+    long countByUserId(String userId);
+
 }

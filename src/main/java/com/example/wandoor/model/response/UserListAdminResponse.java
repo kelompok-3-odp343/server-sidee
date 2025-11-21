@@ -1,17 +1,21 @@
 package com.example.wandoor.model.response;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
 import java.util.List;
-import java.util.Map;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class UserListAdminResponse {
-    private String message;
-    private boolean status;
-    private List<Map<String, Object>> data;
+public record UserListAdminResponse(
+        boolean status,
+        String message,
+        long totalUsers,
+        long activeUsers,
+        long blockedUsers,
+        double avgAccountPerUser,
+        List<UserItem> users
+) {
+    public record UserItem(
+            String userId,
+            String customerId,
+            String customerName,
+            long countAccount,
+            boolean isBlocked
+    ){}
 }
