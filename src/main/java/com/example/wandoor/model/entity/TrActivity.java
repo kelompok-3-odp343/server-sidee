@@ -43,6 +43,7 @@ public class TrActivity {
     @Column(nullable = false)
     private String actionMenu;
     private String status;
+    private String reason;
     private LocalDateTime updatedTimeChecker;
     private LocalDateTime updatedTimeApprover;
     private LocalDateTime createdTime;

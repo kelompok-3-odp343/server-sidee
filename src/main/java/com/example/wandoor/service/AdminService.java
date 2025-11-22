@@ -3,6 +3,7 @@ package com.example.wandoor.service;
 import com.example.wandoor.config.RequestContext;
 import com.example.wandoor.exception.BusinessException;
 import com.example.wandoor.model.entity.AdminProfile;
+import com.example.wandoor.model.entity.Profile;
 import com.example.wandoor.model.entity.RoleManagement;
 import com.example.wandoor.model.entity.TrActivity;
 import com.example.wandoor.model.request.AdminActivityDetailRequest;
@@ -29,10 +30,7 @@ import java.io.Reader;
 import java.sql.Clob;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 @Log4j2
 @Service
@@ -151,7 +149,28 @@ public class AdminService {
                             "INVALID_ACTIVITY_ID",
                             "Activity not Found"));
 
-            Map<String, Object> activityData = parseClobToMap(entity.getMetaData());
+            Map<String, Object> metaData = parseClobToMap(entity.getMetaData());
+            Map<String, Object> activityData = null;
+
+            if ("BLOCK_USER".equalsIgnoreCase(entity.getActionMenu()) || "UNBLOCK_USER".equalsIgnoreCase(entity.getActionMenu())) {
+                String userId = (String) metaData.get("userId");
+
+                Profile userProfile = profileRepository.findById(userId)
+                        .orElseThrow(() ->  new BusinessException(
+                                HttpStatus.CONFLICT,
+                                "INVALID_USER_TO_BLOCK_OR_UNBLOCK",
+                                "Invalid User to Block or Unblock"
+                        ));
+
+                var fullName = userProfile.getFirstName() + " " + userProfile.getMiddleName() + " " + userProfile.getLastName();
+
+                activityData = new HashMap<>();
+                activityData.put("userId", userProfile.getId());
+                activityData.put("customerName", fullName);
+                activityData.put("customerId", userProfile.getCif());
+                activityData.put("reason", entity.getReason());
+                activityData.put("activityStatus", entity.getStatus());
+            }
 
             // fetch Admin Profile
             AdminProfile maker = adminProfileRepository.findById(entity.getMakerId()).orElse(null);
@@ -671,6 +690,7 @@ public class AdminService {
                 .actionMenu(request.getMenuData().getMenuAction())
                 .actionFlow(request.getMenuData().getActionFlow())
                 .identifier(request.getUserData().getUserId())
+                .reason(request.getReason())
                 .status(status)
                 .metaData(convertToClob(request.getUserData()))
                 .createdTime(LocalDateTime.now())

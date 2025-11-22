@@ -1,0 +1,3 @@
+ALTER TABLE TR_ACTIVITY ADD(
+    reason VARCHAR2(500)
+);
