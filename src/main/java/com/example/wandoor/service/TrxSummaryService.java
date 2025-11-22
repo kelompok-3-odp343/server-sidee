@@ -35,12 +35,12 @@ public class TrxSummaryService {
             String adminUserId = getAdminUserId();
             var admin = userAuthRepository.findById(adminUserId)
                     .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User admin tidak ditemukan"));
-            var role = roleManagementRepository.findById(admin.getRoleId())
-                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "ROLE_NOT_FOUND", "Role admin tidak ditemukan"));
-            var roleName = role.getRoleName();
-            if (!("MAKER".equalsIgnoreCase(roleName) || "CHECKER".equalsIgnoreCase(roleName) || "APPROVAL".equalsIgnoreCase(roleName))) {
-                throw new BusinessException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Anda bukan admin — akses ditolak");
-            }
+//            var role = roleManagementRepository.findById(admin.getRoleId())
+//                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "ROLE_NOT_FOUND", "Role admin tidak ditemukan"));
+//            var roleName = role.getRoleName();
+//            if (!("MAKER".equalsIgnoreCase(roleName) || "CHECKER".equalsIgnoreCase(roleName) || "APPROVAL".equalsIgnoreCase(roleName))) {
+//                throw new BusinessException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Anda bukan admin — akses ditolak");
+//            }
 
             double totalSaving = safe(summaryRepository.sumSaving());
             double totalTimeDeposit = safe(summaryRepository.sumTimeDeposit());

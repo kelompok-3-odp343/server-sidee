@@ -19,7 +19,7 @@ public class TrxSummaryController {
 //hshs
     private final TrxSummaryService service;
 
-    @PreAuthorize("hasAnyRole('MAKER','CHECKER','APPROVAL')")
+//    @PreAuthorize("hasAnyRole('MAKER','CHECKER','APPROVAL')")
     @GetMapping("/transaction/summary")
     public ResponseEntity<TrxSummaryResponse> getOverview() {
         return ResponseEntity.ok(service.getOverview());
