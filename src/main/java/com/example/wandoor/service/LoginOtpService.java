@@ -378,6 +378,7 @@ public class LoginOtpService {
         } catch (BusinessException e) {
             throw e;
         }  catch (Exception e) {
+            log.info("kenapa yaaaaa", e);
             throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UNEXPECTED_ERROR", "Something went wrong while reset password", e);
         }
 

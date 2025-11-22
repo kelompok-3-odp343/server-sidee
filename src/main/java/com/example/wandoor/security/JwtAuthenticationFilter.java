@@ -42,7 +42,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 path.equals("/api/auth/resend-otp") ||
                 path.equals("/api/auth/verify-otp") ||
                 path.equals("/api/auth/forgot-password/request-otp") ||
-                path.equals("/api/auth/forgot-password/verify-otp"))
+                path.equals("/api/auth/forgot-password/verify-otp") ||
+                path.equals("/api/auth/forgot-password/reset-password"))
         {
 
             filterChain.doFilter(req, response);
