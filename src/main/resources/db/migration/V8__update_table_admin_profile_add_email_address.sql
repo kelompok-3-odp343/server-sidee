@@ -1,2 +1,0 @@
-ALTER TABLE ADMIN_PROFILE
-ADD email_address VARCHAR2(50) DEFAULT 'email@example.com' NOT NULL;
