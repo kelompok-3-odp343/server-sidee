@@ -1,4 +1,4 @@
-name: CI Wandoor App
+name: CI Wandoor App Optimized
 
 on:
   push:
@@ -24,79 +24,133 @@ jobs:
           --health-retries=10
 
     steps:
+      # Checkout code
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      # Cache Gradle
+      - name: Cache Gradle
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Setup JDK 17
         uses: actions/setup-java@v3
         with:
           java-version: "17"
           distribution: "zulu"
+          cache: gradle
 
-      - name: Wait for Oracle DB to be ready
-        run: |
-          echo "Waiting for Oracle DB to start..."
-          for i in {1..30}; do
-            nc -z localhost 1521 && echo "Oracle is ready!" && break
-            echo "Still waiting..."
-            sleep 10
-          done
-
-      - name: Set environment variables
-        run: |
-          echo "SPRING_DATASOURCE_URL=${{secrets.SPRING_DATASOURCE_URL}}" >> $GITHUB_ENV
-          echo "SPRING_DATASOURCE_USERNAME=${{secrets.SPRING_DATASOURCE_USERNAME}}" >> $GITHUB_ENV
-          echo "SPRING_DATASOURCE_PASSWORD=${{secrets.SPRING_DATASOURCE_PASSWORD}}" >> $GITHUB_ENV
-
+      # Build aplikasi (tanpa test)
       - name: Build with Gradle
-        run: ./gradlew clean build -x test
+        run: ./gradlew clean build -x test --no-daemon
 
-      # Log in to DockerHub
-      - name: Log in to DockerHub
-        uses: docker/login-action@v2
+      # Setup Docker buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Cache Docker layers
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: buildx-${{ github.sha }}
+          restore-keys: buildx-
+
+      # Cache Trivy binary
+      - name: Cache Trivy
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/trivy
+          key: trivy-binary-v0.56.1-Linux-X64
+          restore-keys: trivy-binary-
+
+      # Install Trivy
+      - name: Setup Trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
+
+      # Build local image first (for scanning)
+      - name: Docker build (local)
+        run: |
+          docker build -t jrtr1/wandoor-backend-app:backend-${{ github.sha }} .
+
+      # Scan vulnerability
+      - name: Run Trivy scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: "jrtr1/wandoor-backend-app:backend-${{ github.sha }}"
+          format: "table"
+          exit-code: "0" # tidak block pipeline di staging
+          ignore-unfixed: true
+          vuln-type: "os,library"
+          severity: "HIGH,CRITICAL"
+          timeout: "10m0s"
+          scanners: "vuln"
+
+      # Start backend container for k6 testing
+      - name: Run backend container
+        run: |
+          docker run -d --name backend-test -p 30080:8080 jrtr1/wandoor-backend-app:backend-${{ github.sha }}
+          sleep 15
+
+      - name: Check container status
+        run: docker ps -a
+
+      # Install k6
+      - name: Install k6
+        run: |
+          sudo apt update
+          sudo apt install -y k6
+
+      # Run load test
+      - name: Run k6 load test
+        run: |
+          k6 run k6/load-test.js
+
+      # Docker login (only after scan & load test pass)
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push
+      # Push image
+      - name: Build & Push image
         uses: docker/build-push-action@v6
         with:
+          context: .
           push: true
           tags: |
             jrtr1/wandoor-backend-app:backend-${{ github.sha }}
             jrtr1/wandoor-backend-app:backend-latest
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
 
-      # === Update tag di repo infra ===
-      - name: Checkout infra repository (staging branch)
-        uses: actions/checkout@v3
+      # === Update image tag in repo infra ===
+      - name: Checkout infrastructure repo
+        uses: actions/checkout@v4
         with:
           repository: kelompok-3-odp343/infra
           token: ${{ secrets.ACCESS_TOKEN }}
           path: infra
           ref: staging
 
-      - name: Update image tag in backend deployment
+      - name: Update deployment image tag
         run: |
           cd infra/k3s/backend-wandoor
           sed -i "s|jrtr1/wandoor-backend-app:.*|jrtr1/wandoor-backend-app:backend-${{ github.sha }}|g" backend-deployment.yaml
 
-      - name: Commit and push updated image tag to staging branch
+      - name: Commit and push changes
         run: |
           cd infra
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Tambahkan perintah untuk memastikan tidak error jika tidak ada perubahan
           git add .
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-          else
-            git commit -m "Update backend image tag to backend-${{ github.sha }}"
-            git push origin staging
-          fi
+          git diff --cached --quiet || git commit -m "Update backend image tag to backend-${{ github.sha }}"
+          git push origin staging
