@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.example.wandoor.exception.BusinessException;
 import com.example.wandoor.model.entity.DplkAccount;
+import com.example.wandoor.model.enums.ProductType;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -89,6 +90,7 @@ public class DashboardService {
 
             // 🔹 Account list overview
             var accountList = accounts.stream()
+                    .filter(a -> a.getAccountType() == ProductType.SVG)
                     .map(a -> new FetchDashboardResponse.Accountlist(
                             a.getAccountNumber(),
                             a.getAccountHolderName(),
