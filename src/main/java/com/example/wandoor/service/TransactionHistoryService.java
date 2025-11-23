@@ -63,10 +63,10 @@ public class TransactionHistoryService {
                     })
                     .toList();
 
-            if (targetAccount.isEmpty()) {
-                throw new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND",
-                        "No accounts found for product type " + productType);
-            }
+//            if (targetAccount.isEmpty()) {
+//                throw new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND",
+//                        "No accounts found for product type " + productType);
+//            }
 
             var month = request.month();
             var year = request.year();
