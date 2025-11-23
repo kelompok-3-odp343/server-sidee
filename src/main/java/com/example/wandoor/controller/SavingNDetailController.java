@@ -2,11 +2,8 @@ package com.example.wandoor.controller;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import com.example.wandoor.model.request.SavingDetailRequest;
 
 import com.example.wandoor.model.response.SavingDetailResponse;
 import com.example.wandoor.service.SavingDetailService;
@@ -30,9 +27,8 @@ public class SavingNDetailController {
     }
 
     @PostMapping("/savings/detail")
-    public ResponseEntity<SavingDetailResponse> getSavingsDetail(
-            @RequestBody(required = false) SavingDetailRequest request) {
-        var response = savingDetailService.getSavingsDetail(request);
+    public ResponseEntity<SavingDetailResponse> getSavingsDetail() {
+        var response = savingDetailService.getSavingsDetail(null, null);
         return ResponseEntity.ok(response);
     }
 

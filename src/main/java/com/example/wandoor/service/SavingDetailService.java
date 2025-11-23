@@ -12,6 +12,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 
 import com.example.wandoor.config.RequestContext;
@@ -20,7 +21,7 @@ import com.example.wandoor.model.entity.Account;
 import com.example.wandoor.model.entity.TrxHistory;
 import com.example.wandoor.model.enums.ProductType;
 import com.example.wandoor.model.enums.DebitCredit;
-import com.example.wandoor.model.request.SavingDetailRequest;
+import com.example.wandoor.model.enums.AccountStatus;
 import com.example.wandoor.model.response.SavingDetailResponse;
 import com.example.wandoor.model.response.SavingDetailResponse.BiggestIncoming;
 import com.example.wandoor.model.response.SavingDetailResponse.CategoryBreakdown;
@@ -50,189 +51,181 @@ public class SavingDetailService {
     
 
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
-    private static final DateTimeFormatter ISO_DATETIME_WITH_ZONE = DateTimeFormatter.ISO_DATE_TIME;
 
-    /**
-     * Endpoint utama untuk mendapatkan detail tabungan
-     */
-    public SavingDetailResponse getSavingsDetail(SavingDetailRequest request) {
+    @Transactional(readOnly = true)
+    public SavingDetailResponse getSavingsDetail(String month, String accountNumber) {
 
+        java.time.YearMonth ym = ymFor(month);
+        Account selectedAccount = null;
         try {
+            log.info("getSavingsDetail request: month={}, accountHeader={}", ym, accountNumber);
             String userId = RequestContext.get().getUserId();
             String cif = RequestContext.get().getCif();
+            if (userId == null || userId.isBlank()) {
+                throw new BusinessException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "User ID tidak ditemukan (JWT invalid)");
+            }
             if (cif == null || cif.isBlank()) {
-                cif = profileRepository.findById(userId).map(p -> p.getCif()).orElse(null);
+                cif = profileRepository.findById(userId)
+                        .map(p -> p.getCif())
+                        .orElse(null);
+            }
+            if (cif == null || cif.isBlank()) {
+                throw new BusinessException(HttpStatus.NOT_FOUND, "CIF_NOT_FOUND", "CIF tidak ditemukan di token maupun profil");
             }
             profileRepository.findByIdAndCif(userId, cif)
                     .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND" ,  "User not found"));
 
-            // 3️⃣ Ambil semua rekening tabungan (SAV)
-            List<Account> accounts = accountRepository.findByUserIdAndCifAndAccountType(userId, cif, ProductType.SVG);
+            List<Account> accounts = accountRepository.fetchActiveAccounts(userId, cif, java.util.List.of(AccountStatus.BUKA, AccountStatus.BARU))
+                    .stream()
+                    .filter(a -> a.getAccountType() == ProductType.SVG || a.getAccountType() == ProductType.SAV)
+                    .filter(a -> a.getAccountStatus() == AccountStatus.BUKA || a.getAccountStatus() == AccountStatus.BARU)
+                    .collect(Collectors.toList());
             if (accounts.isEmpty()) {
                 throw new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND" ,"No savings account found");
             }
 
-            // 4️⃣ Tentukan rekening target (dari request atau rekening utama)
-            Account selectedAccount = selectTargetAccount(request, accounts);
+            selectedAccount = selectTargetAccount(accountNumber, accounts);
+            log.info("getSavingsDetail selectedAccount: {}", selectedAccount.getAccountNumber());
 
-            // 5️⃣ Ambil semua transaksi dari rekening tersebut
-            List<TrxHistory> trxList = trxHistoryRepository.findByAccountNumber(selectedAccount.getAccountNumber());
-            if (trxList.isEmpty()) {
-                return buildEmptyResponse(selectedAccount);
-            }
-
-            int targetMonth = java.time.LocalDate.now().getMonthValue();
-            int targetYear = java.time.LocalDate.now().getYear();
-            List<TrxHistory> monthList = trxList.stream()
-                    .filter(t -> t.getTransactionDate() != null
-                            && t.getTransactionDate().getMonthValue() == targetMonth
-                            && t.getTransactionDate().getYear() == targetYear)
-                    .collect(Collectors.toList());
+            int targetMonth = ym.getMonthValue();
+            int targetYear = ym.getYear();
+            List<TrxHistory> monthList = (accountNumber == null || accountNumber.isBlank())
+                    ? accounts.stream()
+                        .flatMap(acc -> trxHistoryRepository
+                                .findByUserIdAndAccountNumberAndMonthYear(userId, acc.getAccountNumber(), targetMonth, targetYear)
+                                .stream())
+                        .collect(Collectors.toList())
+                    : trxHistoryRepository
+                        .findByUserIdAndAccountNumberAndMonthYear(userId, selectedAccount.getAccountNumber(), targetMonth, targetYear);
+            log.info("getSavingsDetail monthList size: {} for month={}, year={}", monthList.size(), targetMonth, targetYear);
 
             if (monthList.isEmpty()) {
-                return buildEmptyResponse(selectedAccount);
+                return buildEmptyResponse(selectedAccount, ym);
             }
 
             Summary summary = calculateSummary(monthList);
 
-            Map<String, String> categoryMap = trxCategoryRepository.findAll().stream()
-                    .collect(Collectors.toMap(
-                            TrxCategory::getId,
-                            c -> {
-                                String name = c.getCategoryName();
-                                return name == null ? "" : name;
-                            }
-                    ));
+            Map<String, String> categoryMap;
+            try {
+                categoryMap = trxCategoryRepository.findAll().stream()
+                        .filter(c -> c.getId() != null && !c.getId().isBlank())
+                        .collect(Collectors.toMap(
+                                TrxCategory::getId,
+                                c -> {
+                                    String name = c.getCategoryName();
+                                    return name == null ? "" : name;
+                                },
+                                (v1, v2) -> v1
+                        ));
+            } catch (Exception ex) {
+                categoryMap = new HashMap<>();
+            }
 
-            // 7️⃣ Temukan kategori pengeluaran dan transaksi masuk terbesar
             Insights insights = calculateInsights(selectedAccount.getAccountNumber(), monthList, categoryMap);
 
-            // 8️⃣ Hitung breakdown kategori (persentase pengeluaran per kategori)
             List<CategoryBreakdown> breakdown = calculateCategoryBreakdown(selectedAccount.getAccountNumber(), monthList, categoryMap);
 
-            // 9️⃣ Ambil meta (bulan transaksi + mata uang)
-            Meta meta = buildMeta(monthList, selectedAccount);
+            Meta meta = buildMeta(monthList, selectedAccount, ym);
 
-            // 🚀 10️⃣ Kembalikan response lengkap
             return new SavingDetailResponse(meta, summary, insights, breakdown);
         } catch (BusinessException e) {
             throw e;
         }  catch (Exception e) {
-            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UNEXPECTED_ERROR", "Something went wrong while retrieving savings detail data", e);
+            log.error("Unexpected error in getSavingsDetail", e);
+            String currency = selectedAccount != null ? Optional.ofNullable(selectedAccount.getCurrencyCode()).orElse("IDR") : "IDR";
+            Meta meta = new Meta(ym.toString(), currency);
+            Summary summary = new Summary(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+            return new SavingDetailResponse(meta, summary, null, null);
         }
 
     }
 
-    /**
-     * Pilih rekening target berdasarkan input user atau akun utama
-     */
-    private Account selectTargetAccount(SavingDetailRequest request, List<Account> accounts) {
-        return Optional.ofNullable(request)
-                .map(SavingDetailRequest::getAccountNumber)
-                .flatMap(accNum -> accounts.stream()
-                        .filter(a -> a.getAccountNumber().equals(accNum))
-                        .findFirst())
-                .orElseGet(() -> accounts.stream()
-                        .filter(a -> a.getIsMainAccount() != null && a.getIsMainAccount() == 1)
-                        .findFirst()
-                        .orElse(accounts.get(0)));
+    private Account selectTargetAccount(String accountNumber, List<Account> accounts) {
+        if (accountNumber != null && !accountNumber.isBlank()) {
+            return accounts.stream()
+                    .filter(a -> a.getAccountNumber().equals(accountNumber))
+                    .findFirst()
+                    .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "Account number not found for user"));
+        }
+        return accounts.stream()
+                .filter(a -> a.getIsMainAccount() != null && a.getIsMainAccount() == 1)
+                .findFirst()
+                .orElse(accounts.get(0));
     }
-
-    /**
-     * Hitung total debit, kredit, dan net growth
-     */
     private Summary calculateSummary(List<TrxHistory> trxList) {
         BigDecimal totalDebit = sumByDebitCredit(trxList, DebitCredit.D);
         BigDecimal totalCredit = sumByDebitCredit(trxList, DebitCredit.C);
         BigDecimal netGrowth = totalCredit.subtract(totalDebit);
         return new Summary(totalDebit, totalCredit, netGrowth);
     }
-
-    /**
-     * Helper untuk menjumlahkan transaksi berdasarkan tipe
-     */
     private BigDecimal sumByDebitCredit(List<TrxHistory> trxList, DebitCredit dc) {
         return trxList.stream()
                 .filter(t -> t.getDebitCredit() == dc)
-                .map(TrxHistory::getTransactionAmount)
+                .map(t -> t.getTransactionAmount() == null ? BigDecimal.ZERO : t.getTransactionAmount())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
-
-    /**
-     * Temukan kategori utama dan transaksi masuk terbesar
-     */
     private Insights calculateInsights(String accountNumber, List<TrxHistory> trxList, Map<String, String> categoryMap) {
-        Map<String, Long> countByCategory = trxList.stream()
-                .filter(t -> t.getDebitCredit() == DebitCredit.D)
-                .collect(Collectors.groupingBy(
-                        t -> {
-                            String key = t.getCategoryId();
-                            String name = key == null ? null : categoryMap.getOrDefault(key, key);
-                            return (name == null || name.isBlank()) ? "Uncategorized" : name;
-                        }, Collectors.counting()
-                ));
-
+        try {
         Map<String, BigDecimal> sumByCategory = trxList.stream()
                 .filter(t -> t.getDebitCredit() == DebitCredit.D)
                 .collect(Collectors.groupingBy(
                         t -> {
                             String key = t.getCategoryId();
                             String name = key == null ? null : categoryMap.getOrDefault(key, key);
-                            return (name == null || name.isBlank()) ? "Uncategorized" : name;
-                        }, Collectors.mapping(TrxHistory::getTransactionAmount,
+                            return (name == null || name.isBlank()) ? "Others" : name;
+                        }, Collectors.mapping(
+                                t -> t.getTransactionAmount() == null ? BigDecimal.ZERO : t.getTransactionAmount(),
                                 Collectors.reducing(BigDecimal.ZERO, BigDecimal::add))
                 ));
 
-        TopCategory topCategory = countByCategory.entrySet().stream()
-                .sorted((e1, e2) -> {
-                    int cmp = Long.compare(e2.getValue(), e1.getValue());
-                    if (cmp != 0) return cmp;
-                    BigDecimal s1 = sumByCategory.getOrDefault(e1.getKey(), BigDecimal.ZERO);
-                    BigDecimal s2 = sumByCategory.getOrDefault(e2.getKey(), BigDecimal.ZERO);
-                    return s2.compareTo(s1);
-                })
+        TopCategory topCategory = sumByCategory.entrySet().stream()
+                .sorted((e1, e2) -> e2.getValue().compareTo(e1.getValue()))
                 .findFirst()
-                .map(e -> new TopCategory(e.getKey(), sumByCategory.getOrDefault(e.getKey(), BigDecimal.ZERO)))
+                .map(e -> new TopCategory(e.getKey(), e.getValue()))
                 .orElse(null);
 
-        // Ambil transaksi masuk (debit) terbesar
         Optional<TrxHistory> biggestIncomingTrx = trxList.stream()
-                .filter(t -> t.getDebitCredit() == DebitCredit.D)
-                .max(Comparator.comparing(TrxHistory::getTransactionAmount));
+                .filter(t -> t.getDebitCredit() == DebitCredit.C)
+                .max(Comparator.comparing(t -> t.getTransactionAmount() == null ? BigDecimal.ZERO : t.getTransactionAmount()));
 
         BiggestIncoming biggestIncoming = biggestIncomingTrx.map(t -> {
             String formattedDate = t.getTransactionDate() != null
-                    ? t.getTransactionDate().atZone(ZoneOffset.systemDefault())
+                    ? t.getTransactionDate().atZone(java.time.ZoneId.systemDefault())
                             .withZoneSameInstant(ZoneOffset.UTC)
-                            .format(ISO_DATETIME_WITH_ZONE) + "Z"
+                            .toInstant()
+                            .toString()
                     : null;
 
-        String pm = Optional.ofNullable(t.getPaymentMethod()).orElse("Other");
-        String source = pm;
+        String catId = t.getCategoryId();
+        String catName = catId == null ? null : categoryMap.getOrDefault(catId, catId);
+        String typeName = (catName == null || catName.isBlank()) ? "Others" : catName;
+        String source = topCategory != null ? topCategory.getName() : "Others";
 
             return new BiggestIncoming(
-                    pm,
-                    t.getTransactionAmount(),
+                    typeName,
+                    t.getTransactionAmount() == null ? BigDecimal.ZERO : t.getTransactionAmount(),
                     source,
                     formattedDate
             );
         }).orElse(null);
 
         return new Insights(topCategory, biggestIncoming);
+        } catch (Exception ex) {
+            return new Insights(null, null);
+        }
     }
 
-    /**
-     * Buat breakdown kategori (pengeluaran per kategori + persen)
-     */
     private List<CategoryBreakdown> calculateCategoryBreakdown(String accountNumber, List<TrxHistory> trxList, Map<String, String> categoryMap) {
+        try {
         Map<String, BigDecimal> totals = trxList.stream()
-                .filter(t -> t.getDebitCredit() == DebitCredit.C)
+                .filter(t -> t.getDebitCredit() == DebitCredit.D)
                 .collect(Collectors.groupingBy(
                         t -> {
                             String key = t.getCategoryId();
                             String name = key == null ? null : categoryMap.getOrDefault(key, key);
-                            return (name == null || name.isBlank()) ? "Uncategorized" : name;
-                        }, Collectors.mapping(TrxHistory::getTransactionAmount,
+                            return (name == null || name.isBlank()) ? "Others" : name;
+                        }, Collectors.mapping(
+                                t -> t.getTransactionAmount() == null ? BigDecimal.ZERO : t.getTransactionAmount(),
                                 Collectors.reducing(BigDecimal.ZERO, BigDecimal::add))
                 ));
 
@@ -251,26 +244,36 @@ public class SavingDetailService {
                 })
                 .sorted(Comparator.comparing(CategoryBreakdown::getTotal_amount).reversed())
                 .collect(Collectors.toList());
+        } catch (Exception ex) {
+            return List.of();
+        }
 
     }
-
-    /**
-     * Buat metadata response (bulan & mata uang)
-     */
-    private Meta buildMeta(List<TrxHistory> trxList, Account account) {
-        String month = trxList.isEmpty()
-                ? java.time.LocalDate.now().format(MONTH_FORMATTER)
-                : trxList.get(0).getTransactionDate().format(MONTH_FORMATTER);
-        return new Meta(month, Optional.ofNullable(account.getCurrencyCode()).orElse("IDR"));
+    private Meta buildMeta(List<TrxHistory> trxList, Account account, java.time.YearMonth requestedMonth) {
+        try {
+            String month = requestedMonth == null
+                    ? (trxList.isEmpty()
+                        ? java.time.LocalDate.now().format(MONTH_FORMATTER)
+                        : trxList.get(0).getTransactionDate().format(MONTH_FORMATTER))
+                    : requestedMonth.toString();
+            return new Meta(month, Optional.ofNullable(account.getCurrencyCode()).orElse("IDR"));
+        } catch (Exception ex) {
+            return new Meta(java.time.LocalDate.now().format(MONTH_FORMATTER), Optional.ofNullable(account.getCurrencyCode()).orElse("IDR"));
+        }
     }
-
-    /**
-     * Jika tidak ada transaksi, kembalikan response default kosong
-     */
-    private SavingDetailResponse buildEmptyResponse(Account selectedAccount) {
-        Meta meta = new Meta(java.time.LocalDate.now().format(MONTH_FORMATTER),
+    private SavingDetailResponse buildEmptyResponse(Account selectedAccount, java.time.YearMonth requestedMonth) {
+        String monthStr = requestedMonth == null ? java.time.LocalDate.now().format(MONTH_FORMATTER) : requestedMonth.toString();
+        Meta meta = new Meta(monthStr,
                 Optional.ofNullable(selectedAccount.getCurrencyCode()).orElse("IDR"));
         Summary summary = new Summary(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
         return new SavingDetailResponse(meta, summary, null, null);
+    }
+
+    private java.time.YearMonth ymFor(String month) {
+        try {
+            return (month == null || month.isBlank()) ? java.time.YearMonth.now() : java.time.YearMonth.parse(month);
+        } catch (Exception ex) {
+            return java.time.YearMonth.now();
+        }
     }
 }
