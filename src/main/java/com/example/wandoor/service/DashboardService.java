@@ -93,7 +93,7 @@ public class DashboardService {
                             a.getAccountNumber(),
                             a.getAccountHolderName(),
                             a.getEffectiveBalance(),
-                            a.getSubCat(),
+                            a.getProductName(),
                             a.getAccountStatus(),
                             a.getCreatedTime()
                     ))

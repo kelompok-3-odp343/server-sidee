@@ -2,10 +2,14 @@ package com.example.wandoor.service;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
+import com.example.wandoor.model.entity.Profile;
+import com.example.wandoor.model.entity.UserAuth;
+import com.example.wandoor.model.response.UserListAdminResponse;
+import com.example.wandoor.repository.AccountRepository;
+import com.example.wandoor.repository.ProfileRepository;
 import com.example.wandoor.repository.UserListAdminRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -15,44 +19,53 @@ import lombok.RequiredArgsConstructor;
 public class UserListAdminService {
 
     private final UserListAdminRepository repository;
+    private final ProfileRepository profileRepository;
+    private final AccountRepository accountRepository;
 
-    public Map<String, Object> getAllUsersList(String userIdHeader) {
+    public UserListAdminResponse getAllUsersList(String userIdHeader) {
 
+        long totalUsers = repository.countNasabahUsers();
+        long activeUsers = repository.countActiveNasabahUsers();
+        long blockedUsers = repository.countBlockedNasabahUsers();
 
-        // ✅ Ambil summary
-        Object[] summary = repository.getUserSummary().get(0);
-    
-        // ✅ Ambil list user
-        List<Object[]> users = repository.findAllNasabahUserList();
-    
-        List<Map<String, Object>> userList = new ArrayList<>();
-        for (Object[] row : users) {
-            userList.add(Map.of(
-                "userId", row[0],
-                "customerId", row[1],
-                "customerName", row[2],
-                "countAccount", row[3],
-                "isBlocked", row[4]
+        List<UserAuth> users = repository.findAllNasabahUsers();
+
+        List<UserListAdminResponse.UserItem> userList = new ArrayList<>();
+        long totalAccounts = 0L;
+        for (UserAuth ua : users) {
+            Profile p = profileRepository.findById(ua.getUserId()).orElse(null);
+            String fullName;
+            if (p != null) {
+                String mid = p.getMiddleName() == null ? "" : p.getMiddleName();
+                fullName = p.getFirstName() + " " + mid + " " + p.getLastName();
+            } else {
+                fullName = ua.getUsername();
+            }
+
+            long countAcc = accountRepository.countByUserId(ua.getUserId());
+            totalAccounts += countAcc;
+
+            boolean blocked = ua.getIsUserBlocked() != null && ua.getIsUserBlocked() == 1;
+            userList.add(new UserListAdminResponse.UserItem(
+                    ua.getUserId(),
+                    p != null ? p.getId() : ua.getUserId(),
+                    fullName,
+                    countAcc,
+                    blocked
             ));
         }
-    
-        return Map.of(
-            "status", true,
-            "message", "Success",
-            "totalUsers", summary[0],
-            "activeUsers", summary[1],
-            "blockedUsers", summary[2],
-            "avgAccountPerUser", summary[3],
-            "users", userList
+
+        double avgAccountPerUser = users.isEmpty() ? 0.0 : (double) totalAccounts / users.size();
+
+        return new UserListAdminResponse(
+                true,
+                "Success",
+                totalUsers,
+                activeUsers,
+                blockedUsers,
+                avgAccountPerUser,
+                userList
         );
     }
     
-
-    private boolean parseBoolean(Object val) {
-        return val instanceof Boolean b ? b : Integer.parseInt(val.toString()) == 1;
-    }
-
-    private String cleanName(String name) {
-        return name.trim().replaceAll(" +", " ");
-    }
 }

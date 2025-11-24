@@ -1,27 +1,26 @@
 package com.example.wandoor.controller;
 
-import com.example.wandoor.model.request.EditSplitBillRequest;
-import com.example.wandoor.model.request.PatchSplitBillRequest;
-import com.example.wandoor.model.request.SplitBillDetailRequest;
-import com.example.wandoor.model.response.*;
-import com.example.wandoor.service.SplitBillService;
+import java.net.URI;
 
-import com.example.wandoor.model.request.AddNewSplitBillRequest;
-import com.example.wandoor.model.response.SplitBillsListResponse;
-import com.example.wandoor.service.SplitBillService;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.log4j.Log4j2;
+import com.example.wandoor.model.response.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.*;
 
-import java.net.URI;
-import java.util.Map;
+import com.example.wandoor.model.request.AddNewSplitBillRequest;
+import com.example.wandoor.model.request.EditSplitBillRequest;
+import com.example.wandoor.model.request.PatchSplitBillRequest;
+import com.example.wandoor.model.request.SplitBillDetailRequest;
+import com.example.wandoor.service.SplitBillService;
+
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 
 @RestController
 @RequestMapping("api/v1/split-bill")
@@ -67,9 +66,9 @@ public class SplitBillController {
     }
 
     @PatchMapping("/mark-paid")
-    public ResponseEntity<Void> markAsPaid(
+    public ResponseEntity<MarkAsPaidSplitBillResponse> markAsPaid(
         @Valid @RequestBody PatchSplitBillRequest request){
-            splitBillService.updateHaspaidSplitBill(request);
-            return ResponseEntity.noContent().build();
+            MarkAsPaidSplitBillResponse response = splitBillService.updateHaspaidSplitBill(request);
+            return ResponseEntity.ok(response);
         }
 }

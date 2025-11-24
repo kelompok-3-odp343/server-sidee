@@ -66,12 +66,15 @@ public class TrxHistory {
 
     private String paymentMethod;
 
+    @Column(name = "CATEGORY_ID")
+    private String categoryId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 1)
     private DebitCredit debitCredit;
 
-    //@Column(nullable = false)
-    //private String splitBillId;
+    @Column(nullable = false)
+    private String splitBillId;
 
     //@Builder.Default
     //@Column(nullable = false)

@@ -8,6 +8,7 @@ public record SplitBillDetailResponse (
     public record Data(
         String splitBillId,
         String splitBillTitle,
+        String accountNumber,
         String currency,
         String transactionId,
         String refId,

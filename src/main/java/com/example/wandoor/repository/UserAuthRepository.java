@@ -10,6 +10,7 @@ import java.util.Optional;
 
 public interface UserAuthRepository extends JpaRepository<UserAuth, String> {
     Optional<UserAuth> findByUsername(String username);
+    Optional<UserAuth> findByUserId(String userId);
 
 //    @Modifying
 //    @Query(
@@ -19,5 +20,9 @@ public interface UserAuthRepository extends JpaRepository<UserAuth, String> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update UserAuth u set u.isUserBlocked = 1 where u.userId = :userId and (u.isUserBlocked is null or u.isUserBlocked <> 1)")
     int markBlockedById(@Param("userId") String userId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update UserAuth u set u.isUserBlocked = 0 where u.userId = :userId and (u.isUserBlocked is null or u.isUserBlocked <> 0)")
+    int markUnblockedById(@Param("userId") String userId);
 
 }

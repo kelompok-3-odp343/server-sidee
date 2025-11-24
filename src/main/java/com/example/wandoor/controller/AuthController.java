@@ -1,11 +1,13 @@
 package com.example.wandoor.controller;
 
+import com.example.wandoor.config.RequestContext;
 import com.example.wandoor.model.request.*;
 import com.example.wandoor.model.response.*;
 import com.example.wandoor.service.LoginOtpService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.parameters.P;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,10 +36,10 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<LogoutResponse> logout (
-            @RequestHeader("Authorization") String auth,
-            @RequestHeader("User-Id") String userId
     ){
-        String token = auth.replace("Bearer ", "");
+        String token = RequestContext.get().getToken();
+        String userId = RequestContext.get().getUserId();
+
         return ResponseEntity.ok(loginOtpService.logout(token, userId));
     }
 

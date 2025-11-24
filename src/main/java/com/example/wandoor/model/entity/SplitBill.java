@@ -1,11 +1,17 @@
 package com.example.wandoor.model.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.UuidGenerator;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 @Data
 @Entity
@@ -18,7 +24,7 @@ public class SplitBill {
     @Id
     @ToString.Include
     @EqualsAndHashCode.Include
-    @UuidGenerator
+    // @UuidGenerator
     @Column(nullable = false, updatable = false)
     private String id;
 

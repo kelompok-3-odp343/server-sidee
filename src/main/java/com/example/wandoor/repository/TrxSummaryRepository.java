@@ -48,28 +48,62 @@ public interface TrxSummaryRepository extends JpaRepository<UserAuth, String> {
     Double sumPensionFund();
 
     @Query(value = """
-        SELECT COALESCE(t.PAYMENT_METHOD, 'Others') AS categoryName,
-               COALESCE(SUM(t.TRANSACTION_AMOUNT), 0) AS total
+        SELECT COALESCE(tc.CATEGORY_NAME, 'Others') AS categoryName
+        FROM WANDOOR.TRX_HISTORY t
+        LEFT JOIN WANDOOR.TRX_CATEGORY tc ON tc.ID = t.CATEGORY_ID
+        JOIN WANDOOR.USER_AUTH ua ON ua.USER_ID = t.USER_ID
+        JOIN WANDOOR.ROLE_MANAGEMENT rm ON rm.ID = ua.ROLE_ID
+        WHERE rm.ROLE_NAME = 'NASABAH'
+        GROUP BY COALESCE(tc.CATEGORY_NAME, 'Others')
+        ORDER BY COUNT(*) DESC
+        """, nativeQuery = true)
+    List<String> fetchAllCategoryNamesForNasabah();
+
+    @Query(value = """
+        SELECT COUNT(*)
+        FROM WANDOOR.TRX_HISTORY t
+        LEFT JOIN WANDOOR.TRX_CATEGORY tc ON tc.ID = t.CATEGORY_ID
+        JOIN WANDOOR.USER_AUTH ua ON ua.USER_ID = t.USER_ID
+        JOIN WANDOOR.ROLE_MANAGEMENT rm ON rm.ID = ua.ROLE_ID
+        WHERE rm.ROLE_NAME = 'NASABAH'
+          AND COALESCE(tc.CATEGORY_NAME, 'Others') = :categoryName
+        """, nativeQuery = true)
+    Long countCategoryTransactionsForNasabah(String categoryName);
+
+    @Query(value = """
+        SELECT COUNT(*)
         FROM WANDOOR.TRX_HISTORY t
         JOIN WANDOOR.USER_AUTH ua ON ua.USER_ID = t.USER_ID
         JOIN WANDOOR.ROLE_MANAGEMENT rm ON rm.ID = ua.ROLE_ID
         WHERE rm.ROLE_NAME = 'NASABAH'
-        GROUP BY COALESCE(t.PAYMENT_METHOD, 'Others')
-        ORDER BY categoryName
         """, nativeQuery = true)
-    List<Object[]> fetchCategoryTotalsForNasabah();
+    Long countAllTransactionsForNasabah();
 
     @Query(value = """
-        SELECT ua.USER_ID AS userid,
-               MIN(a.CIF) AS customerId,
-               p.NIK AS nik,
-               TRIM(p.FIRST_NAME || ' ' || COALESCE(p.MIDDLE_NAME, '') || ' ' || COALESCE(p.LAST_NAME, '')) AS customerName
+        SELECT COALESCE(SUM(t.TRANSACTION_AMOUNT), 0)
+        FROM WANDOOR.TRX_HISTORY t
+        LEFT JOIN WANDOOR.TRX_CATEGORY tc ON tc.ID = t.CATEGORY_ID
+        JOIN WANDOOR.USER_AUTH ua ON ua.USER_ID = t.USER_ID
+        JOIN WANDOOR.ROLE_MANAGEMENT rm ON rm.ID = ua.ROLE_ID
+        WHERE rm.ROLE_NAME = 'NASABAH'
+          AND COALESCE(tc.CATEGORY_NAME, 'Others') = :categoryName
+        """, nativeQuery = true)
+    Double sumCategoryAmountForNasabah(String categoryName);
+
+    @Query(value = """
+        SELECT COALESCE(SUM(t.TRANSACTION_AMOUNT), 0)
+        FROM WANDOOR.TRX_HISTORY t
+        JOIN WANDOOR.USER_AUTH ua ON ua.USER_ID = t.USER_ID
+        JOIN WANDOOR.ROLE_MANAGEMENT rm ON rm.ID = ua.ROLE_ID
+        WHERE rm.ROLE_NAME = 'NASABAH'
+        """, nativeQuery = true)
+    Double sumAllTransactionAmountForNasabah();
+
+    @Query(value = """
+        SELECT ua.USER_ID
         FROM WANDOOR.USER_AUTH ua
         JOIN WANDOOR.ROLE_MANAGEMENT rm ON rm.ID = ua.ROLE_ID AND rm.ROLE_NAME = 'NASABAH'
-        JOIN WANDOOR.PROFILE p ON p.ID = ua.USER_ID
-        LEFT JOIN WANDOOR.ACCOUNT a ON a.USER_ID = ua.USER_ID
-        GROUP BY ua.USER_ID, p.NIK, p.FIRST_NAME, p.MIDDLE_NAME, p.LAST_NAME
-        ORDER BY customerName
+        ORDER BY ua.USER_ID
         """, nativeQuery = true)
-    List<Object[]> fetchAllNasabahUsers();
+    List<String> fetchAllNasabahUserIds();
 }

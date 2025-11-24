@@ -25,29 +25,31 @@ public class DetailUserAdminService {
     private final RoleManagementRepository roleManagementRepository;
 
     public DetailUserAdminResponse getUserDetail(DetailUserAdminRequest request) {
+        try {
+            var authentication = SecurityContextHolder.getContext().getAuthentication();
+            var adminUserId = authentication.getName();
+            var role = authentication.getAuthorities().stream()
+                    .findFirst()
+                    .map(Object::toString)
+                    .orElse("UNKNOWN");
+            log.info("👤 Admin {} (role={}) mengakses data user {}", adminUserId, role, request.getTargetUserId());
 
-        // ✅ Ambil user admin dari JWT (bukan dari header / RequestContext)
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-        var adminUserId = authentication.getName();
-        var role = authentication.getAuthorities().stream()
-                .findFirst()
-                .map(Object::toString)
-                .orElse("UNKNOWN");
-        log.info("👤 Admin {} (role={}) mengakses data user {}", adminUserId, role, request.getTargetUserId());
+            String targetUserId = request.getTargetUserId();
+            if (targetUserId == null || targetUserId.isBlank()) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "UserId nasabah wajib diisi");
+            }
 
-        // ✅ Ambil userId nasabah dari body request
-        String targetUserId = request.getTargetUserId();
-        if (targetUserId == null || targetUserId.isBlank()) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "UserId nasabah wajib diisi1");
+            List<Object[]> results = detailUserAdminRepository.findNasabahDetailByUserId(targetUserId);
+            if (results.isEmpty()) {
+                throw new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "Data nasabah tidak ditemukan");
+            }
+
+            return buildResponse(results);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "UNEXPECTED_ERROR", "Something went wrong while fetching user detail", e);
         }
-
-        // ✅ Eksekusi query detail nasabah
-        List<Object[]> results = detailUserAdminRepository.findNasabahDetailByUserId(targetUserId);
-        if (results.isEmpty()) {
-            throw new BusinessException(HttpStatus.NOT_FOUND, "DATA_NOT_FOUND", "Data nasabah tidak ditemukan!");
-        }
-
-        return buildResponse(results);
     }
 
     // ------------------ Helper ---------------------

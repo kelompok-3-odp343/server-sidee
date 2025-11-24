@@ -4,7 +4,7 @@ import com.example.wandoor.exception.BusinessException;
 import org.springframework.http.HttpStatus;
 
 public enum UserRole {
-    NASABAH, MAKER, CHECKER, APPROVAL;
+    NASABAH, MAKER, CHECKER, APPROVER;
 
     public static UserRole from(String role) {
         try {

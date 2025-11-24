@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration scan="true">
 
-    <!-- Tentukan lokasi log -->
-<!--    <property name="LOG_PATH" value="/logs/springboot" />-->
+<!--     Tentukan lokasi log -->
+    <property name="LOG_PATH" value="logs" />
     <property name="LOG_FILE" value="${LOG_PATH}/app.log" />
 
     <!-- Console Appender (JSON format) -->
