@@ -189,12 +189,12 @@ public class SplitBillService {
                                             splitBIllData.getSplitBillTitle(),
                                             splitBIllData.getAccountNumber(),
                                             splitBIllData.getCurrency(),
+                                            transactionData.getId(),
                                             transactionData.getRefId(),
-                                            splitBIllData.getCreatedTime().toString(),
                                             splitBIllData.getTotalAmount(),
                                             splitBIllData.getCreatedTime().toString(),
-                            transactionData.getTransactionDate().toString(),
-                            memberList
+                                            transactionData.getTransactionDate().toString(),
+                                            memberList
                             );
 
                             // Return response akhir
