@@ -32,10 +32,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private boolean isSwagger(String path) {
         if (path == null) return false;
         String p = path.toLowerCase();
-        return p.startsWith("/api/v1/openapi")
-                || p.startsWith("/api/v1/swagger-ui")
+        return p.startsWith("/api/v1/swagger-ui")
+                || p.startsWith("/api/v1/openapi")
+                
                 || p.startsWith("/swagger-ui")
-                || p.startsWith("/swagger-resources")
+                
                 || p.startsWith("/webjars");
     }
 
@@ -47,7 +48,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String path = req.getRequestURI();
 
-        // Lewati JWT Filter untuk swagger dan endpoint auth publik
+        if ("OPTIONS".equalsIgnoreCase(req.getMethod())) {
+            filterChain.doFilter(req, response);
+            return;
+        }
+
         if (isSwagger(path) || path.startsWith("/api/auth/")) {
             filterChain.doFilter(req, response);
             return;

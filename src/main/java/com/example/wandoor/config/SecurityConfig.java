@@ -48,18 +48,20 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
+                                "/api/v1/swagger-ui",
+                                "/api/v1/swagger-ui/**",
                                 "/api/v1/openapi",
                                 "/api/v1/openapi/**",
-                                "/api/v1/swagger-ui.html",
-                                "/api/v1/swagger-ui/**",
+                               
                                 "/swagger-ui/**",
-                                "/swagger-resources/**",
+                                
                                 "/webjars/**"
                         ).permitAll()
+                        .requestMatchers("/", "/index.html").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**", "/error").permitAll()
                         .requestMatchers("/api/v1/**").hasRole("NASABAH")
-                        .requestMatchers("/api/admin/**").hasAnyRole("MAKER", "CHECKER", "APPROVAL")
+                        .requestMatchers("/api/admin/**").hasAnyRole("MAKER", "CHECKER", "APPROVER")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex

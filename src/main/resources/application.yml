@@ -97,11 +97,11 @@ springdoc:
   api-docs:
     path: /api/v1/openapi
   swagger-ui:
-    path: /api/v1/swagger-ui.html
+    path: /api/v1/swagger-ui
     disable-swagger-default-url: true
     url: /api/v1/openapi
     
   packages-to-scan: com.example.wandoor.controller
-  paths-to-match: /api/auth/**, /api/v1/**
+  paths-to-match: /api/auth/**, /api/v1/**, /api/admin/**
   remove-broken-reference-definitions: true
 
