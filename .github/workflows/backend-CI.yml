@@ -96,7 +96,7 @@ jobs:
           scanners: 'vuln'  # Hanya scan vulnerability (skip secret/config
 
 
-      - name: Check backend container status
+      - name: Check Backend container status
         run: |
           docker ps -a
           docker logs backend-test | tail -n 40
