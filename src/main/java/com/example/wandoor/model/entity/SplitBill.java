@@ -3,9 +3,7 @@ package com.example.wandoor.model.entity;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,11 +19,12 @@ import lombok.ToString;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @ToString(onlyExplicitlyIncluded = true)
 public class SplitBill {
+
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(nullable = false, updatable = false)
     @ToString.Include
     @EqualsAndHashCode.Include
-    // @UuidGenerator
-    @Column(nullable = false, updatable = false)
     private String id;
 
     @Column(nullable = false)
