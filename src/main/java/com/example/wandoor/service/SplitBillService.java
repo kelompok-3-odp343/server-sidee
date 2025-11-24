@@ -367,29 +367,17 @@ public class SplitBillService {
                 if (m.memberId() == null) {
 
                     var entity = new SplitBillMember();
-                    entity.setId(UUID.randomUUID().toString());
                     entity.setSplitBill(splitBill);
                     entity.setUserId(userId);
-                    entity.setCreatedBy(userId);
-                    entity.setUpdatedBy(userId);
-
                     entity.setMemberName(m.memberName());
                     entity.setAmountShare(m.amountShare());
                     entity.setHasPaid(Boolean.TRUE.equals(m.hasPaid()) ? 1 : 0);
-
+                    entity.setIsDeleted(0); // 🔥 WAJIB
+                    entity.setCreatedBy(userId);
                     entity.setCreatedTime(LocalDateTime.now());
+                    entity.setUpdatedBy(userId);
                     entity.setUpdatedTime(LocalDateTime.now());
-
                     splitBillMemberRepository.save(entity);
-                }
-            }
-
-            // ================================
-            // 3️⃣ DELETE MEMBERS REMOVED BY USER
-            // ================================
-            for (var e : existingMembers) {
-                if (!requestIds.contains(e.getId())) {
-                    splitBillMemberRepository.deleteById(e.getId());
                 }
             }
 
