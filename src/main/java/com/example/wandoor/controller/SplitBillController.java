@@ -55,7 +55,7 @@ public class SplitBillController {
                 .body(response);
     }
 
-    @PutMapping("/edit")
+    @PostMapping("/edit")
     public ResponseEntity<EditSplitBillResponse> editSplitBill(
             @Valid @RequestBody EditSplitBillRequest request){
 
@@ -65,7 +65,7 @@ public class SplitBillController {
         return ResponseEntity.ok(response);
     }
 
-    @PatchMapping("/mark-paid")
+    @PostMapping("/mark-paid")
     public ResponseEntity<MarkAsPaidSplitBillResponse> markAsPaid(
         @Valid @RequestBody PatchSplitBillRequest request){
             MarkAsPaidSplitBillResponse response = splitBillService.updateHaspaidSplitBill(request);
