@@ -72,7 +72,9 @@ public class SecurityConfig {
                 "https://app.wandoor.my.id",
                 "https://api.wandoor.my.id",
                 "http://34.143.146.191:30080",
-                "http://34.143.146.191:30081"
+                "http://34.143.146.191:30081",
+                "http://35.240.135.52:30080",
+                "http://35.240.135.52:30081"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
