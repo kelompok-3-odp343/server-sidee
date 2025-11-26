@@ -37,6 +37,7 @@ dependencies {
     implementation("io.soabase.record-builder:record-builder-core:47")
 	// --- Metrics for Prometheus ---
 	implementation("io.micrometer:micrometer-registry-prometheus")
+    implementation("io.github.cdimascio:dotenv-java:3.2.0")
 	
 
 	// --- JSON logging (for LTM / ELK / Loki)

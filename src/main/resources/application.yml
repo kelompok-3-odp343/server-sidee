@@ -4,8 +4,8 @@ spring:
 
   datasource:
     url: "jdbc:oracle:thin:@localhost:1521/WANDOOR_DB"
-    username: ${DB_USERNAME:wandoor}
-    password: ${DB_PASSWORD:root}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: oracle.jdbc.OracleDriver
 
   jpa:
@@ -26,8 +26,8 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: noreply.wandoor@gmail.com
-    password: nzsn zqay hwok fozq
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
     properties:
       mail:
         smtp:
@@ -41,9 +41,9 @@ spring:
 
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:rediswandoor}
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD}
 
 logging:
   level:
@@ -60,7 +60,7 @@ logging:
 # secret & expiry JWT
 app:
   jwt:
-    secret: ${JWT_SECRET:MySuperSecretKeyForBankingApp}
+    secret: ${JWT_SECRET}
     expiration-ms: 3600000
 
 server:

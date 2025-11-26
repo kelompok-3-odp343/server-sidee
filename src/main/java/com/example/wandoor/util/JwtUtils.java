@@ -14,7 +14,7 @@ import java.util.Map;
 @Component
 @Log4j2
 public class JwtUtils {
-    @Value("${app.jwt.secret}")
+    @Value("${JWT_SECRET}")
     private String jwtSecret;
 
     @Value("${app.jwt.expiration-ms:3600000}")
